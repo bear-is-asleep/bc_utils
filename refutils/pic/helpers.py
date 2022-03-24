@@ -1,28 +1,21 @@
 import numpy as np
-from random import choice
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import matplotlib.cm as cm
-from matplotlib.colors import Normalize
-import math
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
-from datetime import date
 import sys
 sys.path.append('/sbnd/app/users/brindenc/mypython')
-import seaborn as sns
-import matplotlib
-from scipy import optimize
-from sklearn.linear_model import LinearRegression
 from numpy import isin, sqrt,exp,arctan,cos,sin,pi
 from time import time
-from bc_utils.utils import pic
+from bc_utils.pmtutils import pic
+from math import comb
+import scipy
 
 #Constants
-R_cpa = 0.6
-R_apa = 0
-R_fc = 0
+R_cpa = 0 #VUV
+R_apa = R_fc = 0.26 #VUV
+R_cpa_vis = 0.92 #vis
+R_apa_vis = R_fc_vis = 0.585 #vis
+
 
 def reflect_xz(y,flip=2,ref=1,L=400):
   #Returns new y, reflected across face in xz plane in detector
@@ -193,10 +186,19 @@ def sortstrings_numerically(strings,sort=True,drop_ints=True):
     tups = flatten_list(tups)
   return tups
 
+def calc_prob_vis(cpa_ref):
+  #Calculate the probability of a photon being vis given # of cpa_ref
+  return 1 - scipy.stats.binom.pmf(1,cpa_ref,pic.e_ws)
+
+  
+
 def get_ref_coefs(singref,coating):
   #singref is a single PMT with all of its reflections (see make_single_reflection)
   Rs = np.zeros(singref.shape[0]) #calculates reflectivity based on the surface in question
-  Ref_coefs = np.array([R_cpa,R_apa,R_fc]) #Reflectivity of cpa,apa,field cage
+  vis_probs = np.zeros(singref.shape[0]) #calculates probability of photon being vis
+  vuv_probs = np.zeros(singref.shape[0]) #calculates probability of photon being vuv
+  Ref_coefs = np.array([R_cpa,R_apa,R_fc]) #Reflectivity of cpa,apa,field cage VUV
+  Ref_coefs_vis = np.array([R_cpa_vis,R_apa_vis,R_fc_vis]) #Reflectivity of cpa,apa,field cage VUV
   for row,line in singref.iterrows():
     #Get number of reflections in each plane
     x_ref = line['x_ref']
@@ -209,30 +211,35 @@ def get_ref_coefs(singref,coating):
 
     #Map to Rs array
     R=1
+    vis_prob = calc_prob_vis(cpa_ref) #Probability of being visible photon (using binomial theorem)
+    vuv_prob = 1 - vis_prob
     for i,ref in enumerate(refs):
       if ref != 0: #There is a reflection
         if i == 1 or i == 2: #fc reflection
-          R*=Ref_coefs[2]**ref
+          R*=Ref_coefs[2]**ref*vuv_prob+Ref_coefs_vis[2]**ref*vis_prob
         elif i == 3: #cpa ref
           if coating == 0:
-            R*=Ref_coefs[0]**ref
+            R*=(Ref_coefs[0])**ref*vuv_prob+(Ref_coefs_vis[0])**ref*vis_prob
           else:
-            R*=(Ref_coefs[0]*pic.e_ws)**ref
-          
+            R*=(Ref_coefs[0])**ref*vuv_prob+(Ref_coefs_vis[0])**ref*vis_prob
         elif i == 4: #apa ref
-          R*=Ref_coefs[1]**ref
+          R*=Ref_coefs[1]**ref*vuv_prob+Ref_coefs_vis[1]**ref*vis_prob
     if coating == 1 and x_ref == 0 and y_ref == 0 and z_ref == 0: #set coated PMTs initial R to 0
       Rs[row] = 0
     else:
       Rs[row] = R
+    vis_probs[row] = vis_prob
+    vuv_probs[row] = vuv_prob
   singref.loc[:,'Reflectivity'] = Rs
+  singref.loc[:,'vis_prob'] = vis_probs
+  singref.loc[:,'vuv_prob'] = vuv_probs
   return singref
 
-def get_ref_PMTs(pmts):
+def get_ref_PMTs(pmts,n_ref=1):
   #pmts is PMT_info.pkl dataframe
 
   new_pmts = pd.DataFrame(columns=['ophit_opdet_x','ophit_opdet_y','ophit_opdet_z','ophit_opdet_type',
-  'opdet_tpc','tot_ref','cpa_ref','apa_ref','ophit_opdet','x_ref','y_ref','z_ref','Reflectivity'])
+  'opdet_tpc','tot_ref','cpa_ref','apa_ref','ophit_opdet','x_ref','y_ref','z_ref','Reflectivity','true_x','true_y','true_z'])
 
   for row,line in pmts.iterrows():
     ch = row
@@ -241,10 +248,15 @@ def get_ref_PMTs(pmts):
     z = line['ophit_opdet_z']
     coating = line['ophit_opdet_type']
     tpc = line['opdet_tpc']
-    singref = single_plane_reflection(x,y,z,flip_coord='xyz',x_refs=1,y_refs=1,z_refs=1,initialize=True,ch=ch)
+    singref = single_plane_reflection(x,y,z,flip_coord='xyz',x_refs=n_ref,y_refs=n_ref,
+    z_refs=n_ref,initialize=True,ch=ch)
     singref = get_ref_coefs(singref,coating)
     singref.loc[:,'ophit_opdet_type'] = coating
     singref.loc[:,'opdet_tpc'] = tpc
+    singref.loc[:,'maxreflectivity'] = max(singref.loc[:,'Reflectivity'])
+    singref.loc[:,'true_x'] = x
+    singref.loc[:,'true_y'] = y
+    singref.loc[:,'true_z'] = z
     frames = [new_pmts,singref]
     new_pmts = pd.concat(frames) #Merge frames
   return new_pmts
