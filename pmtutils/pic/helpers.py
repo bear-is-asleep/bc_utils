@@ -924,6 +924,9 @@ def make_ref_df(pmts,muontracks,op_hits,events,subruns,runs,cwd,move_dfs=True):
   predkeys = [key for key in columns if 'ophit_pred' in key]
   #err keys
   errkeys = [key for key in columns if 'pred_err' in key]
+  #Keys to sum over for total dataframe (namely hit counts)
+  keys_to_sum = predkeys.copy()
+  keys_to_sum.append('ophit_obs')
 
   pmt_info = np.zeros((pmts.shape[0],muontracks.shape[0],len(columns)))
   j=0 #Counter for 2nd dim. (muon tracks)
@@ -1125,6 +1128,10 @@ def make_ref_df(pmts,muontracks,op_hits,events,subruns,runs,cwd,move_dfs=True):
             pmt_info[i][j][39] = N_pred_nodisp_noref
             pmt_info[i][j][40] = err_nodisp_noref
 
+            #Variables that could cause bugs
+            #_disp = d_calc(d_s)
+            #_att = d_calc(d_s)
+
             i+=1 #Count up for PMTs
           j+=1 #Count up for muon tracks
         end = time()
@@ -1139,7 +1146,7 @@ def make_ref_df(pmts,muontracks,op_hits,events,subruns,runs,cwd,move_dfs=True):
 
   #Recalculate errors using summed prediction and obs. values
   pmt_hits_df_trunc = truncate_df(pmt_hits_df,predkeys,errkeys,
-  keys_to_sum={'ophit_pred','ophit_obs'},mod_chs=True) #mod channels
+  keys_to_sum=keys_to_sum,mod_chs=True) #mod channels
 
   #Remove extra zeros that may show up...
   pmt_hits_df = pmt_hits_df[pmt_hits_df.loc[:,'ophit_ch'] != 0]

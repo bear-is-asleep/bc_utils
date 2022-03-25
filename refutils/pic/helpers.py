@@ -188,7 +188,7 @@ def sortstrings_numerically(strings,sort=True,drop_ints=True):
 
 def calc_prob_vis(cpa_ref):
   #Calculate the probability of a photon being vis given # of cpa_ref
-  return 1 - scipy.stats.binom.pmf(1,cpa_ref,pic.e_ws)
+  return scipy.stats.binom.pmf(1,cpa_ref,pic.e_ws)
 
   
 
