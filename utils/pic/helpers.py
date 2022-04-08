@@ -115,3 +115,12 @@ def pickle_to_root(fpname):
   #Just type filename with or without path in front of it
   zz = 0
 
+def get_central_arr(arr,nleft,nright=None):
+  #Get center n values of array
+  #nleft is number of values to left
+  #nright is number of values to right
+  if nright is None:
+    nright = nleft
+  length = len(arr)
+  return arr[int(length/2)-nleft:int(length/2)+nright]
+

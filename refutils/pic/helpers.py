@@ -48,13 +48,13 @@ def reflect_yz(x,flip=2,ref=1):
       cpa_ref = int((ref+1)/2)
     else:
       cpa_ref = int(ref/2)
-    x_prime = x-L*ref #Since x is always the same
+    x_prime = x-2*L*ref #Since x is always the same
   else: #apa
     if x > 0: #cpa is on other side for opposite tpc
       cpa_ref = int(ref/2)
     else:
       cpa_ref = int((ref+1)/2)
-    x_prime = x+L*ref #Since x is always the same
+    x_prime = x+2*L*ref #Since x is always the same
   
   return x_prime,cpa_ref,ref-cpa_ref #Also return number of cpa reflections, it has reflective coating
 

@@ -77,3 +77,21 @@ def max_bin_height(ax,bins):
     if bar.get_height() > max_bin:
       max_bin = bar.get_height()
   return max_bin
+
+def get_bincenters(binedges):
+  #Return bin centers from edges
+  length = len(binedges) - 1
+  bincenters = np.zeros(length) #Minus 1 for loss o557.0f 1 value
+  for i in range(length):
+    bincenters[i] = (binedges[i] + binedges[i+1])/2
+  return bincenters
+
+def convert_p_str(parameters):
+  s = ''
+  last_key = list(parameters)[-1]
+  for key in parameters.keys():
+    if last_key == key:
+      s+= f"{key} = {parameters[key]}"
+    else:
+      s+= f"{key} = {parameters[key]}\n"
+  return s

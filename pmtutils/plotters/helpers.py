@@ -13,12 +13,13 @@ import matplotlib
 from scipy import optimize
 from mpl_toolkits.mplot3d import Axes3D
 from bc_utils.pmtutils import pic
+from bc_utils.utils import pic,plotters
 #matplotlib.rcParams['axes.unicode_minus'] = False
 
 xls = 16 #axis size
 tls = 20 #title size
 lls = 16 #legend size
-tbs=10 #Text box size
+tbs=14 #Text box size
 #Small displacement for text
 small = 5
 matplotlib.rcParams['xtick.labelsize'] = 13
@@ -84,16 +85,6 @@ def make_lines():
   plt.axvline(x=125,linestyle='--',linewidth=3)
   plt.axvline(x=250,linestyle='--',linewidth=3)
   plt.axvline(x=375,linestyle='--',linewidth=3)
-
-def convert_p_str(parameters):
-  s = ''
-  last_key = list(parameters)[-1]
-  for key in parameters.keys():
-    if last_key == key:
-      s+= f"{key} = {parameters[key][0]} {parameters[key][1]}"
-    else:
-      s+= f"{key} = {parameters[key][0]} {parameters[key][1]}\n"
-  return s
 
 def kde_1dhist(df,titles,xlabels,ylabels,keys,show,save,save_name,fit_gaus,trim_outliers):
   #Make kde plots
@@ -222,7 +213,8 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
   data_points = np.asarray(data_points)
   #print(data_points[:,3])
   if normalize:
-    data_points[:,3] = data_points[:,3]/data_points[:,3].sum()
+    if data_points[:,3].sum() != 0: #Don't divide if the sume is zero!
+      data_points[:,3] = data_points[:,3]/data_points[:,3].sum()
   sc = ax.scatter(data_points[:,2],data_points[:,1],c=data_points[:,3],cmap=cmap,s=80,alpha=0.7)
   ax.margins(x=0.05)
   divider = make_axes_locatable(ax)
@@ -238,7 +230,7 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
     return fig,ax
 
 #Plot muon tracks
-def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_key1,ax='None',fig='None'):
+def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_key1,ax='None',fig='None',indeces=0):
   #Plot muon tracks with coordinate x as horizantel axis, y as vertical
   #Use keys
 
@@ -248,19 +240,50 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
     ax = fig.add_subplot()
     plot_text = True
   else: plot_text = False
-  #TPC0
-  x1_0 = df[x1_key0].to_numpy()
-  y1_0 = df[y1_key0].to_numpy()
-  x2_0 = df[x2_key0].to_numpy()
-  y2_0 = df[y2_key0].to_numpy()
-  #TPC1
-  x1_1 = df[x1_key1].to_numpy()
-  y1_1 = df[y1_key1].to_numpy()
-  x2_1 = df[x2_key1].to_numpy()
-  y2_1 = df[y2_key1].to_numpy()
+  if isinstance(df[x1_key0],np.int64): #Why is it np.int64? Ask pandas idk
+    #TPC0
+    x1_0 = np.asarray([df[x1_key0]])
+    y1_0 = np.asarray([df[y1_key0]])
+    x2_0 = np.asarray([df[x2_key0]])
+    y2_0 = np.asarray([df[y2_key0]])
+    #TPC1
+    x1_1 = np.asarray([df[x1_key1]])
+    y1_1 = np.asarray([df[y1_key1]])
+    x2_1 = np.asarray([df[x2_key1]])
+    y2_1 = np.asarray([df[y2_key1]])
+  else:
+    x1_0 = df[x1_key0].to_numpy()
+    y1_0 = df[y1_key0].to_numpy()
+    x2_0 = df[x2_key0].to_numpy()
+    y2_0 = df[y2_key0].to_numpy()
+    #TPC1
+    x1_1 = df[x1_key1].to_numpy()
+    y1_1 = df[y1_key1].to_numpy()
+    x2_1 = df[x2_key1].to_numpy()
+    y2_1 = df[y2_key1].to_numpy()
   
+
+
   #Keep track of event ID
-  events = df['event'].to_numpy()
+
+  #old method
+  if indeces == 0:
+    events = df['event'].to_numpy()
+    subruns = df['subrun'].to_numpy()
+    runs = df['run'].to_numpy()
+  else:
+    events = []
+    subruns = []
+    runs = []
+    for index in indeces:
+      events.append(index[2])
+      subruns.append(index[1])
+      runs.append(index[0])
+    events = np.asarray(events)
+    subruns = np.asarray(subruns)
+    runs = np.asarray(runs)
+
+  
 
 
   #Create labels for plot
@@ -280,7 +303,14 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
 
   #print(events.shape,x1_1.shape)
   events0 = []
+  subruns0 = []
+  runs0 = []
   events1 = []
+  subruns1 = []
+  runs1 = []
+
+  #Locally define small
+  small = 10
   for i in range(events.shape[0]):
     #Small offset for text
     smallx = choice([-1*small,small,0])
@@ -290,6 +320,8 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
      #and events[i] not in events0:
       #Slope and intercept for text
       events0.append(events[i])
+      subruns0.append(subruns[i])
+      runs0.append(runs[i])
       xs = [x1_0[i],x2_0[i]]
       ys = [y1_0[i],y2_0[i]]
       xtext,ytext = (xs[1]+xs[0])/2+smallx,(ys[1]+ys[0])/2+smally
@@ -298,7 +330,8 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
         ax.set_xlabel(xlabel,fontsize=xls)
         ax.set_ylabel(ylabel,fontsize=xls)
         ax.set_title(title,fontsize=tls)
-        ax.text(xtext,ytext,f'{int(events[i])}',fontsize=tbs)
+        #ax.text(xtext,ytext,f'{int(runs[i])},{int(subruns[i])},{int(events[i])}',fontsize=tbs)
+        ax.text(xtext,ytext,f'{int(subruns[i])},{int(events[i])}',fontsize=tbs)
       else: 
         ax.plot(xs,ys,ls='--',c='r',label=r'$\mu$ tracks')
         #ax.legend(fontsize=lls)
@@ -308,6 +341,8 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
       # and events[i] not in events1:
       #Slope and intercept for text
       events1.append(events[i])
+      subruns1.append(subruns[i])
+      runs1.append(runs[i])
       xs = [x1_1[i],x2_1[i]]
       ys = [y1_1[i],y2_1[i]]
       xtext,ytext = (xs[1]+xs[0])/2+smallx,(ys[1]+ys[0])/2+smally
@@ -316,7 +351,8 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
         ax.set_xlabel(xlabel,fontsize=xls)
         ax.set_ylabel(ylabel,fontsize=xls)
         ax.set_title(title,fontsize=tls)
-        ax.text(xtext,ytext,f'{int(events[i])}',fontsize=tbs)
+        #ax.text(xtext,ytext,f'{int(runs[i])},{int(subruns[i])},{int(events[i])}',fontsize=tbs)
+        ax.text(xtext,ytext,f'{int(subruns[i])},{int(events[i])}',fontsize=tbs)
       else: 
         ax.plot(xs,ys,ls='--',c='r',label=r'$\mu$ tracks')
         #ax.legend(fontsize=lls)
@@ -324,6 +360,7 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
 
   #save_plot('tracks')
   #plt.show()
+  return ax,fig
 
 def make_plane_meshes(x,yl=-200,yu=200,zl=0,zu=500,yiter=400,ziter=500,xiter=200,n_ref=1):
   ys = np.linspace(yl,yu,2) #Get all y refs.
@@ -379,3 +416,94 @@ coord_ref_df=pd.DataFrame(),elev=20,azim=40,axis='on',title=''):
     ax.set_title(title,fontsize=tls+15)
   ax.axis(axis)
   return ax
+
+def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=2):
+  #Make kde histogram using dataframe and its key
+  #df is input dataframe
+  #xkey is x axis key to make bin sizes
+  #ykey is y axis to make scale
+  #index is which event we want
+  #bw is bin wdith
+  #pmt specifies which pmt we're looking at: 0 is coated, 1 is uncoated, 2 is all of them, otherwise its the channel
+  xs = df.loc[index,xkey].values
+  ys = df.loc[index,ykey].values
+  pmts = df.loc[index,'ophit_opch'].values
+  coatings = df.loc[index,'ophit_opdet_type'].values
+  tpcs = df.loc[index,'op_tpc'].values
+  binedges = np.arange(xs.min(),xs.max()+bw,bw)
+
+  check_all = False #Check all pmts will be using if pmt=2
+  check_ch = False #Check only a single chanel
+  if tpc == 2: 
+    check_tpc = False
+    title_tpc = ''
+  else: 
+    check_tpc = True
+    title_tpc = f' TPC{tpc}'
+  if pmt == 0 or pmt == 1: #Use this to 
+    check_coating = True
+    if pmt == 0:
+      title_pmt = ' Coated PMTs '
+    if pmt == 1:
+      title_pmt = ' Uncoated PMTs '
+  else:
+    check_coating = False
+    if pmt == 2:
+      check_all = True
+      title_pmt = ''
+    else:
+      check_ch = True
+      title_pmt = f' PMT{pmt} '
+  #Make title for plots
+  title = f'PE vs. timing{title_pmt}{title_tpc}\nRun {index[0]}, Subrun {index[1]}, Event {index[2]}'
+
+  y_hist = np.zeros(len(binedges)) #Histogram values
+  inds = np.digitize(xs,binedges) #Returns list with indeces where value belongs
+  for i,ind in enumerate(inds):
+    if check_tpc and tpc != tpcs[i]: continue #Skip events with incorrect tpc
+    if check_coating and coatings[i] == pmt: #Make sure we're checking the right coating
+      y_hist[ind] += ys[i] #Add y-val which belongs to this pmt
+    elif check_all:
+      y_hist[ind] += ys[i] #Add y-val which belongs to this pmt
+    elif check_ch and pmts[i] == pmt: #Make sure we're checking the right pmt
+      y_hist[ind] += ys[i] #Add y-val which belongs to this pmt
+  #bincenters = binedges - bw/2 #temp fix of x-axis not being centered
+  bincenters = binedges #temp fix of x-axis not being centered
+  return bincenters,y_hist,title
+
+def make_bar_scatter_plot(bincenters,yvals,bw,title='',left=-1,right=8,truncate=True,normalize=False):
+  #Make figure and axis
+  fig = plt.figure(figsize=(7,4))
+  ax = fig.add_subplot()
+  #Truncate data to capture interesting stuff
+  if truncate:
+    boolean_array = np.logical_and(bincenters >= left, bincenters <= right) #find indeces between left and right
+    inds_in_range = np.where(boolean_array)[0]
+    bincenters=bincenters[inds_in_range]
+    yvals=yvals[inds_in_range]
+  if normalize:
+    yvals = yvals/yvals.sum()
+
+  #ax.plot(bincenters,yvals,c='r')
+  ax.bar(bincenters,yvals,width=bw)
+
+  #Make parameters dictionary
+  min_t = bincenters[0] - bw/2
+  max_t = bincenters[-1] + bw/2
+  parameters = {'Max PE ': f'{yvals.max():.2e}',
+                #'Median PE = ': yvals.median(),
+                'Mean PE ': f'{yvals.mean():.2e}',
+                'Total PE ': f'{yvals.sum():.2e}',
+                r'$\Delta t$ ':bw,
+                r'Time slice ($\mu$s) ': f'[{min_t:.1f},{max_t:.1f}]'}
+  stattext = plotters.convert_p_str(parameters)
+  props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+  # place a text box in upper right in axes coords
+  ax.text(0.45, 0.95, stattext, transform=ax.transAxes, fontsize=tbs,
+        verticalalignment='top', bbox=props)
+  ax.set_title(title,fontsize=tls)
+  ax.set_xlabel(r'$t$ ($\mu$s)',fontsize=xls)
+  ax.set_ylabel('PE',fontsize=xls)
+  return ax,fig
+
+
