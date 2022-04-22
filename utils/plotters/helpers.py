@@ -39,14 +39,14 @@ def use_science_style():
 
 #Organization
 def make_plot_dir():
-    day = date.today().strftime("%d_%m_%Y")
+    day = date.today().strftime("%Y_%m_%d")
     isDir = os.path.isdir("Plots/Plots_"+day)
     if isDir == False:
         os.system("mkdir -p Plots_" +day)
         os.system("mv -n Plots_" +day+"/ Plots/")
 
 def save_plot(fname,fig=None,ftype='.jpg',dpi=500):
-    day = date.today().strftime("%d_%m_%Y")
+    day = date.today().strftime("%Y_%m_%d")
     if fig == None:
       plt.savefig(f'{fname}{ftype}',bbox_inches = "tight",dpi=dpi)
     else:

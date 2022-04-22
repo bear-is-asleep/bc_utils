@@ -140,7 +140,7 @@ def kde_1dhist(df,titles,xlabels,ylabels,keys,show,save,save_name,fit_gaus,trim_
       plt.close(fig)
 
 def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False,
-            normalize=False):
+            normalize=False,facecolor='cyan'):
   #If coating is 2, plot both, coating 0 for coated, coating 1 for uncoated
   if df.shape[0] != 120:
     print('df needs to contain only one event, or combined events')
@@ -153,7 +153,7 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
   #Plot 2d hist with colorscale as label
   fig = plt.figure(figsize=(10,8))
   ax = fig.add_subplot()
-  ax.set_facecolor('cyan')
+  ax.set_facecolor(facecolor)
   make_lines()
 
 
@@ -216,10 +216,10 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
     if data_points[:,3].sum() != 0: #Don't divide if the sume is zero!
       data_points[:,3] = data_points[:,3]/data_points[:,3].sum()
   sc = ax.scatter(data_points[:,2],data_points[:,1],c=data_points[:,3],cmap=cmap,s=80,alpha=0.7)
-  ax.margins(x=0.05)
-  divider = make_axes_locatable(ax)
-  cax = divider.append_axes("right", size="5%", pad=0.05)
-  cbar = fig.colorbar(sc,cax=cax,ax=ax)
+  #ax.margins(x=0.05)
+  #divider = make_axes_locatable(ax)
+  #cax = divider.append_axes("right", size="5%", pad=0.05)
+  #cbar = fig.colorbar(sc,cax=cax,ax=ax)
   #cbar.set_label(f'{label_title}',rotation=270,fontsize=xls)
   ax.set_xlabel('Z [cm]',fontsize=xls)
   ax.set_ylabel('Y [cm]',fontsize=xls)
@@ -326,12 +326,12 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
       ys = [y1_0[i],y2_0[i]]
       xtext,ytext = (xs[1]+xs[0])/2+smallx,(ys[1]+ys[0])/2+smally
       if plot_text:
-        ax.plot(xs,ys)
+        ax.plot(xs,ys,ls='-')
         ax.set_xlabel(xlabel,fontsize=xls)
         ax.set_ylabel(ylabel,fontsize=xls)
         ax.set_title(title,fontsize=tls)
         #ax.text(xtext,ytext,f'{int(runs[i])},{int(subruns[i])},{int(events[i])}',fontsize=tbs)
-        ax.text(xtext,ytext,f'{int(subruns[i])},{int(events[i])}',fontsize=tbs)
+        #ax.text(xtext,ytext,f'{int(subruns[i])},{int(events[i])}',fontsize=tbs)
       else: 
         ax.plot(xs,ys,ls='--',c='r',label=r'$\mu$ tracks')
         #ax.legend(fontsize=lls)
@@ -455,8 +455,8 @@ def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=2):
       check_ch = True
       title_pmt = f' PMT{pmt} '
   #Make title for plots
-  title = f'PE vs. timing{title_pmt}{title_tpc}\nRun {index[0]}, Subrun {index[1]}, Event {index[2]}'
-
+  #title = f'PE vs. timing{title_pmt}{title_tpc}\nRun {index[0]}, Subrun {index[1]}, Event {index[2]}'
+  title = f'PE vs. timing{title_pmt}{title_tpc}'
   y_hist = np.zeros(len(binedges)) #Histogram values
   inds = np.digitize(xs,binedges) #Returns list with indeces where value belongs
   for i,ind in enumerate(inds):
@@ -471,9 +471,10 @@ def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=2):
   bincenters = binedges #temp fix of x-axis not being centered
   return bincenters,y_hist,title
 
-def make_bar_scatter_plot(bincenters,yvals,bw,title='',left=-1,right=8,truncate=True,normalize=False):
+def make_bar_scatter_plot(bincenters,yvals,bw,title='',left=-1,right=8,truncate=True,normalize=False,
+  textx=0.45,texty=0.95,vlinex1=None,vlinex2=None):
   #Make figure and axis
-  fig = plt.figure(figsize=(7,4))
+  fig = plt.figure(figsize=(7,2.5))
   ax = fig.add_subplot()
   #Truncate data to capture interesting stuff
   if truncate:
@@ -490,20 +491,38 @@ def make_bar_scatter_plot(bincenters,yvals,bw,title='',left=-1,right=8,truncate=
   #Make parameters dictionary
   min_t = bincenters[0] - bw/2
   max_t = bincenters[-1] + bw/2
-  parameters = {'Max PE ': f'{yvals.max():.2e}',
+  max_bin = bincenters[np.where(yvals == max(yvals))][0] #Find t bin center with max PE
+  if vlinex1 is None and vlinex2 is None:
+    plot_lines = False
+    parameters = {'Max PE ': f'{yvals.max():.2e}',
+                r'Peak T ($\mu$s)':f'{max_bin:.3f}',
                 #'Median PE = ': yvals.median(),
-                'Mean PE ': f'{yvals.mean():.2e}',
+                #'Mean PE ': f'{yvals.mean():.2e}',
                 'Total PE ': f'{yvals.sum():.2e}',
-                r'$\Delta t$ ':bw,
-                r'Time slice ($\mu$s) ': f'[{min_t:.1f},{max_t:.1f}]'}
+                r'$\Delta t$ ':f'{bw:.3f}'}
+                #r'Time slice ($\mu$s) ': f'[{min_t:.1f},{max_t:.1f}]',
+                #r'Time slice ($\mu$s) ': f'[{min_t:.1f},{max_t:.1f}]'}
+  else:
+    plot_lines = True
+    parameters = {'Max PE ': f'{yvals.max():.2e}',
+                r'Peak T ($\mu$s)':f'{max_bin:.3f}',
+                #'Median PE = ': yvals.median(),
+                #'Mean PE ': f'{yvals.mean():.2e}',
+                'Total PE ': f'{yvals.sum():.2e}',
+                r'$\Delta t$ ':f'{bw:.3f}',
+                #r'Time slice ($\mu$s) ': f'[{min_t:.1f},{max_t:.1f}]',
+                r'Time slice ($\mu$s) ': f'[{vlinex1},{vlinex2}]'}
   stattext = plotters.convert_p_str(parameters)
   props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
   # place a text box in upper right in axes coords
-  ax.text(0.45, 0.95, stattext, transform=ax.transAxes, fontsize=tbs,
+  ax.text(textx, texty, stattext, transform=ax.transAxes, fontsize=tbs,
         verticalalignment='top', bbox=props)
   ax.set_title(title,fontsize=tls)
   ax.set_xlabel(r'$t$ ($\mu$s)',fontsize=xls)
   ax.set_ylabel('PE',fontsize=xls)
+  if plot_lines:
+    ax.axvline(x=vlinex1,ls='--',c='k')
+    ax.axvline(x=vlinex2,ls='--',c='k')
   return ax,fig
 
 

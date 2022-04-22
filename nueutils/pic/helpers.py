@@ -205,7 +205,7 @@ def get_pot_normalized_df(df,target_pot,pot,events,seed=420):
   drop_indices = np.random.choice(index, n_drop, replace=False)
   return df.drop(drop_indices),n_keep
 
-def get_eventype_count(df,pdg,pdg_key='pdg'):
+def get_eventype_count(df,pdg,pdg_key='genie_primaries_pdg'):
   #Returns number of events with a pdg
   #Also returns indeces with pdg
   #Also returns fraction of events with pdg
@@ -223,7 +223,7 @@ def get_eventype_count(df,pdg,pdg_key='pdg'):
   return cnt,has_pdg,cnt/events
 
 def calc_thetat(df,method=0,return_key='theta_t',theta_xz_key='theta_xz',theta_yz_key='theta_yz',
-px_key='Px',py_key='Py',pz_key='Pz',p_key='P'):
+px_key='genie_Px',py_key='genie_Py',pz_key='genie_Pz',p_key='genie_P'):
   #Calculate transverse angle (off z-axis) for given dataframe, appends it to dataframe
   #Method 0 is using angles
   #Method 1 is using momenta
@@ -248,7 +248,7 @@ px_key='Px',py_key='Py',pz_key='Pz',p_key='P'):
   df.loc[:,return_key] = thetat
   return df
 
-def calc_Etheta(df,return_key='E_theta^2',E_key='Eng',theta_t_key='theta_t'):
+def calc_Etheta(df,return_key='E_theta^2',E_key='genie_Eng',theta_t_key='theta_t'):
   #Calc E_etheta^2 for electrons
   if return_key in df.columns:
     df.drop(return_key,axis=1)
@@ -260,7 +260,7 @@ def calc_Etheta(df,return_key='E_theta^2',E_key='Eng',theta_t_key='theta_t'):
   df.loc[:,return_key] = E_theta2
   return df
 
-def get_scat_type(df,pdg_key='pdg',return_key='scat_type'):
+def get_scat_type(df,pdg_key='genie_primaries_pdg',return_key='scat_type'):
   #Appends scat type to dataframe
   if return_key in df.columns:
     df.drop(return_key,axis=1)
@@ -288,7 +288,7 @@ def get_signal_background(scat,back):
   #print(len(list(scat.index.drop_duplicates())),len(list(back.index.drop_duplicates())))
   return len(list(scat.index.drop_duplicates()))/len(list(back.index.drop_duplicates()))
 
-def make_cuts(df,pdg_key='pdg',method=0,Etheta=0.03,Etheta_key='E_theta^2'):
+def make_cuts(df,pdg_key='genie_primaries_pdg',method=0,Etheta=0.03,Etheta_key='E_theta^2'):
   #Make background cuts, returns cut index
   #Method 0: E theta^2 cut
   e_df = df[df.loc[:,pdg_key] == 11] #Filter by electron
@@ -308,7 +308,7 @@ def make_cuts(df,pdg_key='pdg',method=0,Etheta=0.03,Etheta_key='E_theta^2'):
   
   return df.loc[keep_indeces]
 
-def get_electron_count(df,pdg_key='pdg',return_key='e_count',drop_duplicates=False):
+def get_electron_count(df,pdg_key='genie_primaries_pdg',return_key='e_count',drop_duplicates=False):
   #Get electron count for each event
   indeces = df.index.drop_duplicates()
   indeces = list(indeces)
@@ -355,3 +355,6 @@ def get_shw_df(rootname,treename,offset=0):
     indeces = list(shw.index.values) 
     return shw,indeces
   
+def drop_initial_e(df,pdg_key='genie_primaries_pdg',p_key='genie_P',small=1e-5):
+  good_inds = ~((df[pdg_key] == 11) & (df[p_key] < small).values)
+  return df.loc[good_inds]
