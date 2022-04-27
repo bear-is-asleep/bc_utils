@@ -425,8 +425,8 @@ def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=2):
   #index is which event we want
   #bw is bin wdith
   #pmt specifies which pmt we're looking at: 0 is coated, 1 is uncoated, 2 is all of them, otherwise its the channel
-  xs = df.loc[index,xkey].values
-  ys = df.loc[index,ykey].values
+  xs = df.loc[index,xkey].sort_index().values
+  ys = df.loc[index,ykey].sort_index().values
   pmts = df.loc[index,'ophit_opch'].values
   coatings = df.loc[index,'ophit_opdet_type'].values
   tpcs = df.loc[index,'op_tpc'].values
@@ -457,7 +457,7 @@ def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=2):
   #Make title for plots
   #title = f'PE vs. timing{title_pmt}{title_tpc}\nRun {index[0]}, Subrun {index[1]}, Event {index[2]}'
   title = f'PE vs. timing{title_pmt}{title_tpc}'
-  y_hist = np.zeros(len(binedges)) #Histogram values
+  y_hist = np.zeros(len(binedges)+1) #Histogram values, add one buffer
   inds = np.digitize(xs,binedges) #Returns list with indeces where value belongs
   for i,ind in enumerate(inds):
     if check_tpc and tpc != tpcs[i]: continue #Skip events with incorrect tpc
@@ -524,5 +524,107 @@ def make_bar_scatter_plot(bincenters,yvals,bw,title='',left=-1,right=8,truncate=
     ax.axvline(x=vlinex1,ls='--',c='k')
     ax.axvline(x=vlinex2,ls='--',c='k')
   return ax,fig
+
+def interactive_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False,
+            normalize=False,facecolor='cyan',ax=None,fig=None,sc=None,label_PMTs=True,vmax=None):
+  #If coating is 2, plot both, coating 0 for coated, coating 1 for uncoated
+  if df.shape[0] != 120:
+    print('df needs to contain only one event, or combined events')
+    return None
+  #Plot 2d hist with colorscale as label
+  if fig is None and ax is None:
+    #plt.subplots_adjust(left=0.25, bottom=0.25)
+    fig = plt.figure(figsize=(10,8))
+    ax = fig.add_subplot()
+    make_lines()
+  #if sc is not None:
+  #  sc.remove()
+  #fig = plt.figure(figsize=(10,8))
+  #ax = fig.add_subplot()
+  #make_lines()
+  ax.set_facecolor(facecolor)
+  
+
+
+
+  data_points = []
+  for _,line in df.iterrows():
+    #print(line)
+    skip = False #Skips text for PMTs that are filtered
+    det_type = int(line['ophit_opdet_type'])
+    det_ch = str(int(line['ophit_ch']))
+    x = line['ophit_opdet_x']
+    y = line['ophit_opdet_y']
+    z = line['ophit_opdet_z']
+    c = line[label]
+    data_line = [x,y,z,c]
+    if tpc == 0 and x < 0:
+      #Apply coating cut
+      if coating == 2:
+        if det_type == 0 or det_type == 1:
+          data_points.append(data_line)
+          skip = True #Keeps good PMTs
+      elif coating == 1 or coating == 0:
+        if det_type == coating:
+          data_points.append(data_line)
+          skip = True #Keeps good PMTs
+      if z > 250 and skip and label_PMTs:
+        if det_ch == 166 or det_ch == 160:
+          ax.text(z-2*small,y-2*small,det_ch,fontsize=tbs)
+        else:
+          ax.text(z-2*small,y+small,det_ch,fontsize=tbs)
+      if z < 250 and skip and label_PMTs:
+        if det_ch == 150 or det_ch == 156:
+          ax.text(z+0.15*small,y-2*small,det_ch,fontsize=tbs)
+        else:
+          ax.text(z+0.15*small,y+small,det_ch,fontsize=tbs)
+    
+    if tpc == 1 and x > 0: #186 included (for some reason)
+      #Apply coating cut
+      if coating == 2:
+        if det_type == 0 or det_type == 1:
+          data_points.append(data_line)
+          skip = True #Keeps good PMTs
+      elif coating == 1 or coating == 0:
+        if det_type == coating:
+          data_points.append(data_line)
+          skip = True #Keeps good PMTs
+      if z > 250 and skip and label_PMTs: 
+        if det_ch == 166 or det_ch == 160:
+          ax.text(z-2*small,y-2*small,det_ch,fontsize=tbs)
+        else:
+          ax.text(z-2*small,y+small,det_ch,fontsize=tbs)
+      if z < 250 and skip and label_PMTs:
+        if det_ch == 150 or det_ch == 156:
+          ax.text(z+0.15*small,y-2*small,det_ch,fontsize=tbs)
+        else:
+          ax.text(z+0.15*small,y+small,det_ch,fontsize=tbs)
+
+  data_points = np.asarray(data_points)
+  #print(data_points[:,3])
+  if normalize:
+    if data_points[:,3].sum() != 0: #Don't divide if the sume is zero!
+      data_points[:,3] = data_points[:,3]/data_points[:,3].sum()
+  #print(data_points)
+  sc = ax.scatter(data_points[:,2],data_points[:,1],c=data_points[:,3],cmap=cmap,s=80,alpha=0.7,vmax=vmax)
+  plt.subplots_adjust(left=0.25)
+  ax.margins(x=0.05)
+  divider = make_axes_locatable(ax)
+  cax = divider.append_axes("right", size="5%", pad=0.05)
+  cbar = fig.colorbar(sc,cax=cax,ax=ax)
+  #cbar.set_label(f'{label_title}',rotation=270,fontsize=xls)
+  ax.set_xlabel('Z [cm]',fontsize=xls)
+  ax.set_ylabel('Y [cm]',fontsize=xls)
+  ax.set_title(f'{label_title} TPC{tpc}',fontsize = tls)
+  ax.set_xlim([0,500])
+  ax.set_ylim([-200,200])
+  if return_plot:
+    return fig,ax,sc,cax
+  else:
+    return fig,ax
+
+def update_TPC(sc,label,df):
+  #Update TPC plot without overriding all the text
+  qq = 3
 
 
