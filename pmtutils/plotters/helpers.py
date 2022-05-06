@@ -230,9 +230,15 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
     return fig,ax
 
 #Plot muon tracks
-def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_key1,ax='None',fig='None',indeces=0):
+def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_key1,ax='None',fig='None',indeces=0,
+  z1_key0=None,z2_key0=None,z1_key1=None,z2_key1=None,tpc=2):
   #Plot muon tracks with coordinate x as horizantel axis, y as vertical
   #Use keys
+
+  #Handle text for 3rd coord
+  plot_3d_coord = True
+  if z1_key0 is None: #Handle plotting 3rd coordinate option
+    plot_3d_coord = False
 
   #Set figure 
   if ax == 'None' and fig == 'None':
@@ -246,11 +252,18 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
     y1_0 = np.asarray([df[y1_key0]])
     x2_0 = np.asarray([df[x2_key0]])
     y2_0 = np.asarray([df[y2_key0]])
+
     #TPC1
     x1_1 = np.asarray([df[x1_key1]])
     y1_1 = np.asarray([df[y1_key1]])
     x2_1 = np.asarray([df[x2_key1]])
     y2_1 = np.asarray([df[y2_key1]])
+
+    if plot_3d_coord:
+      z1_0 = np.asarray([df[z1_key0]])
+      z2_0 = np.asarray([df[z2_key0]])
+      z1_1 = np.asarray([df[z1_key1]])
+      z2_1 = np.asarray([df[z2_key1]])
   else:
     x1_0 = df[x1_key0].to_numpy()
     y1_0 = df[y1_key0].to_numpy()
@@ -261,7 +274,14 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
     y1_1 = df[y1_key1].to_numpy()
     x2_1 = df[x2_key1].to_numpy()
     y2_1 = df[y2_key1].to_numpy()
-  
+
+    if plot_3d_coord:
+      z1_0 = df[z1_key0].to_numpy()
+      z2_0 = df[z2_key0].to_numpy()
+      z1_1 = df[z1_key1].to_numpy()
+      z2_1 = df[z2_key1].to_numpy()
+
+
 
 
   #Keep track of event ID
@@ -316,7 +336,7 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
     smallx = choice([-1*small,small,0])
     smally = choice([-1*small,small,0])
     #In TPC0
-    if x1_1[i] == -999 and x2_1[i] == -999 and y1_1[i] == -999 and y2_1[i] == -999:
+    if x1_1[i] == -999 and x2_1[i] == -999 and y1_1[i] == -999 and y2_1[i] == -999 and tpc == 0 or tpc == 2:
      #and events[i] not in events0:
       #Slope and intercept for text
       events0.append(events[i])
@@ -336,8 +356,14 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
         ax.plot(xs,ys,ls='--',c='r',label=r'$\mu$ tracks')
         #ax.legend(fontsize=lls)
         #plt.text(xtext,ytext,f'{int(events[i])}',fontsize=tbs)
+      if plot_3d_coord:
+        zs = [z1_0[i],z2_0[i]]
+        text1 = [xs[0]+smallx,ys[0]+smally]
+        text2 = [xs[1]+smallx,ys[1]+smally]
+        plt.text(text1[0],text1[1],f'x = {zs[0]:.1f}',fontsize=tbs)
+        plt.text(text2[0],text2[1],f'x = {zs[1]:.1f}',fontsize=tbs)
     #In TPC1
-    if x1_0[i] == -999 and x2_0[i] == -999 and y1_0[i] == -999 and y2_0[i] == -999:
+    if x1_0[i] == -999 and x2_0[i] == -999 and y1_0[i] == -999 and y2_0[i] == -999 and tpc == 1 or tpc == 2:
       # and events[i] not in events1:
       #Slope and intercept for text
       events1.append(events[i])
@@ -357,6 +383,13 @@ def plot_tracks(df,x1_key0,y1_key0,x2_key0,y2_key0,x1_key1,y1_key1,x2_key1,y2_ke
         ax.plot(xs,ys,ls='--',c='r',label=r'$\mu$ tracks')
         #ax.legend(fontsize=lls)
         #plt.text(xtext,ytext,f'{int(events[i])}',fontsize=tbs)
+      if plot_3d_coord:
+        zs = [z1_1[i],z2_1[i]]
+        text1 = [xs[0],ys[0]]
+        text2 = [xs[1],ys[1]]
+        print(text1,text2,zs)
+        ax.text(text1[0],text1[1],f'x = {zs[0]:.1f}',fontsize=tbs)
+        ax.text(text2[0],text2[1],f'x = {zs[1]:.1f}',fontsize=tbs)
 
   #save_plot('tracks')
   #plt.show()
