@@ -5,6 +5,8 @@ import pandas as pd
 import os
 from datetime import date
 import sys
+sys.path.append('/sbnd/app/users/brindenc/mypython') #My utils path
+from bc_utils.pmtutils import plotters as pmtplotters
 from scipy import optimize
 from sklearn.linear_model import LinearRegression
 from numpy import isin, sqrt,exp,arctan,cos,sin,pi
@@ -990,3 +992,26 @@ def make_ref_df(pmts,muontracks,op_hits,events,subruns,runs,cwd,move_dfs=True):
   if move_dfs:
     os.system('mkdir -p read_model')
     os.system(f'mv {cwd}muon_tracks.pkl {cwd}pmt_hits_df* {cwd}read_model')
+
+def get_peakT(op_df,pmts,tpc,index,bw,number_pmts=10,thresholdPE=1,convert_to_edge=False):
+  #Must be an op_df
+  #pmts are the pmt information
+  #tpc specifies which one we want to check, 1 or 0
+  #Get peak time, so number_pmts has to be above the threshold
+  pmts = pmts[pmts.loc[:,'opdet_tpc']==tpc] #Iterate over correct channels
+  chs = pmts.loc[:,'ophit_opdet'].values
+  chPEs = [] #List of all channels PEs
+  for ch in chs: #Get PE/timing for each channel
+    bincenters,chPE,_ = pmtplotters.get_xy_bins(op_df,'ophit_peakT','ophit_pe',index,bw,pmt=ch,tpc=tpc) 
+    chPEs.append(chPE)
+  #Now iterate over the rows, to find when number_pmts exceeds the threshold
+  chPEs = np.array(chPEs) #Convert to numpy array to have access to transpose
+  for i,PEslice in enumerate(chPEs.T):#iterae of transpose to get each timeslice, instead of each channel
+    if len([*filter(lambda x: x >= thresholdPE, PEslice)])>=number_pmts:
+      peakT = bincenters[i]
+      if convert_to_edge:
+        return peakT - bw/2 #Convert to edge, not center
+      else: 
+        return peakT
+  #return -9999 #Return if the peakT threshold is not found
+

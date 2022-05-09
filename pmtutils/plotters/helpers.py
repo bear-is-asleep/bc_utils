@@ -656,8 +656,6 @@ def interactive_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plo
   else:
     return fig,ax
 
-def update_TPC(sc,label,df):
-  #Update TPC plot without overriding all the text
-  qq = 3
+
 
 

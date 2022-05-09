@@ -28,6 +28,9 @@ matplotlib.rcParams['legend.fontsize'] = 'large'
 matplotlib.rcParams['axes.titlesize'] = 'x-large'
 matplotlib.rcParams['figure.figsize'] = [9,7]
 
+#Date info
+day = date.today().strftime("%Y_%m_%d")
+
 
 def use_science_style():
   if 'science' in plt.style.available:
@@ -45,14 +48,13 @@ def make_plot_dir():
         os.system("mkdir -p Plots_" +day)
         os.system("mv -n Plots_" +day+"/ Plots/")
 
-def save_plot(fname,fig=None,ftype='.jpg',dpi=500):
-    day = date.today().strftime("%Y_%m_%d")
+def save_plot(fname,fig=None,ftype='.jpg',dpi=500,folder_name=f'Plots_{day}'):
+    os.system(f'mkdir -p Plots/{folder_name}')
     if fig == None:
       plt.savefig(f'{fname}{ftype}',bbox_inches = "tight",dpi=dpi)
     else:
       fig.savefig(f'{fname}{ftype}',bbox_inches = "tight",dpi=dpi)
-    #print(os.getcwd())
-    os.system("mv " + fname + "* Plots/Plots_" +day+"/")
+    os.system("mv " + fname + f"* Plots/{folder_name}/")
 
 def plot_stuff():
   matplotlib.rcParams['xtick.labelsize'] = 13
