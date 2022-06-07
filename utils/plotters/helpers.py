@@ -42,6 +42,7 @@ def use_science_style():
 
 #Organization
 def make_plot_dir():
+    #day = date.today().strftime("%Y_%m_%d")
     day = date.today().strftime("%Y_%m_%d")
     isDir = os.path.isdir("Plots/Plots_"+day)
     if isDir == False:

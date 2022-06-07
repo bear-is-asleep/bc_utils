@@ -14,6 +14,9 @@ import sys
 import seaborn as sns
 import matplotlib
 from scipy import optimize
+sys.path.append('/sbnd/app/users/brindenc/mypython') #My utils path
+from bc_utils.utils import pic,plotters
+
 #matplotlib.rcParams['axes.unicode_minus'] = False
 
 xls = 16 #axis size
@@ -154,11 +157,20 @@ def hist_scattype(df,hist_key,bw=-1,pdg_key='pdg',pdg=11,scat_key='scat_type',ti
   return ax,fig
 
 xls = tls = lls =18
-def hist_scatback(scat,back,hist_key,nbins=20,pdg_key='pdg',pdg=11,
-  scat_key='scat_type',back_key='back_type',title='',xlabel='',ylabel='',alpha=0.9,scale='linear'):
+def hist_scatback(scat,back,hist_key,sb=None,nbins=None,pdg_key='genie_primaries_pdg',pdg=11,
+  scat_key='scat_type',back_key='background_type',title='',xlabel='',ylabel='',alpha=0.9,scale='linear',
+  bw=None,stacked=False,histtype='bar',pdgs=[11],include_background=True):
   #Histogram with background and scattered events overlayed, with each type of scattering and background
-  scat = scat[scat.loc[:,pdg_key] == pdg]
-  back = back[back.loc[:,pdg_key] == pdg]
+  scat_dfs = []
+  back_dfs = []
+  for pdg in pdgs:
+    scat_dfs.append(scat[abs(scat.loc[:,pdg_key]) == pdg])
+    back_dfs.append(back[abs(back.loc[:,pdg_key]) == pdg])
+  scat = pd.concat(scat_dfs)
+  back = pd.concat(back_dfs)
+  
+  #scat = scat[abs(scat.loc[:,pdg_key]) == pdg]
+  #back = back[abs(back.loc[:,pdg_key]) == pdg]
   if title == '':
     title = hist_key
   if xlabel == '':
@@ -191,27 +203,102 @@ def hist_scatback(scat,back,hist_key,nbins=20,pdg_key='pdg',pdg=11,
   cc_1gam = [] #Pion decays into one photon
   #Fill arrays with data according to back key
   for line,row in back.iterrows():
-    if int(row.loc[back_key]) == 1: #T < 20 MeV proton
-      cc_1p0pi.append(row.loc[hist_key])
-    if int(row.loc[back_key]) == 0: #1e0p0pi
+    if int(row.loc[back_key]) == 0: #T < 20 MeV proton,pion
       cc_0p0pi.append(row.loc[hist_key])
+    if int(row.loc[back_key]) == 1: #Maybe pion decay eventually
+      cc_1p0pi.append(row.loc[hist_key])
+  if sb is None and include_background:
+    parameters = {#'Signal/Background':f'{sb:.2f}',
+                  'Signal Events':f'{len(scat)}',
+                  'Background Events':f'{len(back)}'
+                  #''
+    }
+  elif include_background:
+    parameters = {'Signal/Background':f'{sb:.2f}',
+                  'Signal Events':f'{len(scat)}',
+                  'Background Events':f'{len(back)}'
+                  #''
+    }
+  else:
+    parameters = {#'Signal/Background':f'{sb:.2f}',
+                  'Signal Events':f'{len(scat)}',
+                  #'Background Events':f'{len(back)}'
+                  #''
+    }
 
-  bins=np.linspace(min(min(nu_mu),min(nu_e),min(nubar_mu),min(nubar_e),min(cc_1p0pi),min(cc_0p0pi)),
-  max(max(nu_mu),max(nu_e),max(nubar_mu),max(nubar_e),max(cc_1p0pi),max(cc_0p0pi)),nbins)
-  
-  fig = plt.figure()
+  if bw is None and nbins is not None:
+    bins=np.linspace(min(min(nu_mu,default=np.nan),
+                  min(nu_e,default=np.nan),
+                  min(nubar_mu,default=np.nan),
+                  min(nubar_e,default=np.nan),
+                  min(cc_1p0pi,default=np.nan),
+                  min(cc_0p0pi,default=np.nan)),
+                  max(max(nu_mu,default=np.nan),
+                  max(nu_e,default=np.nan),
+                  max(nubar_mu,default=np.nan),
+                  max(nubar_e,default=np.nan),
+                  max(cc_1p0pi,default=np.nan),
+                  max(cc_0p0pi,default=np.nan)),nbins)
+    parameters['Bins'] = f'{nbins}'
+  elif bw is not None and nbins is None:
+    bins=np.arange(min(min(nu_mu,default=np.nan),
+                  min(nu_e,default=np.nan),
+                  min(nubar_mu,default=np.nan),
+                  min(nubar_e,default=np.nan),
+                  min(cc_1p0pi,default=np.nan),
+                  min(cc_0p0pi,default=np.nan)),
+                  max(max(nu_mu,default=np.nan),
+                  max(nu_e,default=np.nan),
+                  max(nubar_mu,default=np.nan),
+                  max(nubar_e,default=np.nan),
+                  max(cc_1p0pi,default=np.nan),
+                  max(cc_0p0pi,default=np.nan))+bw,bw)
+    parameters['Binwidth']=f'{bw}'
+  #print(parameters)
+  ptext = plotters.convert_p_str(parameters)
+  props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+
+
+  # print(min(nu_mu,default=np.nan),
+  #                 min(nu_e,default=np.nan),
+  #                 min(nubar_mu,default=np.nan),
+  #                 min(nubar_e,default=np.nan),
+  #                 min(cc_1p0pi,default=np.nan),
+  #                 min(cc_0p0pi,default=np.nan))
+  #print(cc_0p0pi)
+
+  fig = plt.figure(figsize=(9,7))
   ax = fig.add_subplot()
   #ax.hist(cc_1p0pi,bins=bins,label=r'CC 1$e$1$p$0$\pi$ ($T_p$ < 20 MeV)',alpha=alpha)
-  ax.hist(cc_0p0pi,bins=bins,label=r'CC 1$e$0$p$0$\pi$',alpha=alpha)
-  ax.hist(nu_mu,bins=bins,label=r'$\nu_\mu + e^-$',alpha=alpha)
-  ax.hist(nu_e,bins=bins,label=r'$\nu_e + e^-$',alpha=alpha)
-  ax.hist(nubar_mu,bins=bins,label=r'$\bar{\nu}_\mu + e^-$',alpha=alpha)
-  ax.hist(nubar_e,bins=bins,label=r'$\bar{\nu}_e + e^-$',alpha=alpha)
+  if not stacked:
+    if include_background:
+      ax.hist(cc_0p0pi,bins=bins,label=r'CC 1$e$0$p$0$\pi$',alpha=alpha,
+              histtype=histtype)
+    ax.hist(nu_mu,bins=bins,label=r'$\nu_\mu + e^-$',alpha=alpha,
+            histtype=histtype)
+    ax.hist(nu_e,bins=bins,label=r'$\nu_e + e^-$',alpha=alpha,
+            histtype=histtype)
+    ax.hist(nubar_mu,bins=bins,label=r'$\bar{\nu}_\mu + e^-$',alpha=alpha,
+            histtype=histtype)
+    ax.hist(nubar_e,bins=bins,label=r'$\bar{\nu}_e + e^-$',alpha=alpha,
+            histtype=histtype)
+  else:
+    labels = [r'$\nu_\mu + e^-$',r'$\nu_e + e^-$',
+              r'$\bar{\nu}_\mu + e^-$',r'$\bar{\nu}_e + e^-$']
+    nus = [nu_mu,nu_e,nubar_mu,nubar_e]
+    if include_background:
+      labels.extend([r'CC 1$e$0$p$0$\pi$'])
+      nus.append(cc_0p0pi)
+    ax.hist(nus,bins=bins,stacked=stacked,histtype=histtype,label=labels,alpha=alpha)
+
   ax.set_xlabel(xlabel,fontsize=xls)
   ax.set_ylabel(ylabel,fontsize=xls)
   ax.set_title(title,fontsize=tls)
   ax.legend(fontsize=lls)
   ax.set_yscale(scale)
+  # place a text box in upper right in axes coords
+  ax.text(0.6, 0.5, ptext, transform=ax.transAxes, fontsize=tbs+3,
+        verticalalignment='top', bbox=props)
   return ax,fig
 
 

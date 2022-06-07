@@ -3,7 +3,6 @@ from random import choice
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.cm as cm
 from matplotlib.colors import Normalize
-import math
 from scipy.stats import norm
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,103 +15,18 @@ import matplotlib
 from scipy import optimize
 from numpy import sqrt,exp,arctan,cos,sin,pi,arccos
 import uproot
+from time import time
 
 #Constants
 hc = 1240 #eV nm
 r_e = 2.818e-15 #m
 alpha = 1/137 #alpha
-m_e = 511e3 #eV/c^2
+m_e = .511e-3 #GeV/c^2
 n_A = 1.3954/6.6335209e-23 #n_A/cm^3
 m_u = 105.658 #MeV
 
-def print_stars():
-  print('\n******************************\n')
-
-#Gaussian fit
-def gaussian(x,a, mean, stddev):
-  #Ex: popt, pcov = optimize.curve_fit(gaussian, x, data)
-  return a*np.exp(-((x - mean) / 4 / stddev)**2)
-
-def fit_gaussian(data):
-  #Fits gaussian to 1d data and returns parameters
-  steps=len(data)
-  x = np.linspace(min(data),max(data),steps)
-  popt, pcov = optimize.curve_fit(gaussian, x, data)
-  return x,popt,pcov
-
-def sum_combine(arr,every_other=2,col_options=[]):
-  """
-  DESC: Somes int=every_other for every other row
-  arr: 2D array
-  every_other: How many rows to combine, i.e. every_other=2 combines every other 
-               line
-  col_options: Enter column options 1D array same number of columns as arr.
-               Set column to 0 for sum of column from i to i+every_other 
-  """
-  
-  if arr.ndim == 1:
-    arr = np.reshape(arr,(arr.size,1))
-    #print (arr.shape)
-
-  result = [] #Store result here
-  extra_rows=[] #Store extra rows here
-  if not col_options.any():
-    col_options = np.zeros(arr.shape[1]) #Set colunn default
-  for (i,line) in enumerate(arr): #Iterate rows
-    if np.mod(i+1,every_other) == 0: #Check if it's row to sum over and store
-      row = [] #Store row here
-      for (j,ele) in enumerate(line):
-        val = 0
-        temp = []
-        if col_options[j] == 0:
-          for k in range(i-every_other+1,i+1):
-            val+=arr[k,j]
-          row.append(val)
-      
-        if col_options[j] == 1:
-          for k in range(i-every_other+1,i+1):
-            temp.append(arr[k,j])
-          val = np.mean(temp)
-          row.append(val)
-        if col_options[j] == 2:
-          for k in range(i-every_other+1,i+1):
-            temp.append(arr[k,j])
-          val = np.median(temp)
-
-          row.append(val)
-      result.append(row)
-      extra_rows = []
-    elif i == np.shape(arr)[0]-1:
-     #print(i)
-      extra_rows.append(line)
-      return np.asarray(np.vstack((result,extra_rows))) #Returns extra rows
-    else:
-      extra_rows.append(line)
-  return np.asarray(result)
 
 
-def truncate_df(df,keys_to_sum = {''},keys_to_median = {''}):
-  #Truncate df for average values across all events and runs, len(df) = number of PMTs
-  cols = df.shape[1]
-  col_options = np.ones(cols)
-  
-  #set sum_combine to 0 for sum, 1 for mean, 2 for med
-  for i,key in enumerate(df.keys()):
-    if key in keys_to_sum:
-      col_options[i]=0
-    if key in keys_to_median:
-      col_options[i]=2
-  #Extract all PMT channel information and store in single df
-  all_trunc = []
-  for i in range(int(df['ophit_ch'].min()),int(df['ophit_ch'].max())+1):
-    df_temp = df.loc[df['ophit_ch']==i]
-    if df_temp.empty:
-      continue
-    np_temp = df_temp.to_numpy()
-    np_trunc = sum_combine(np_temp,every_other=np_temp.shape[0],col_options=col_options)
-    all_trunc.append(np_trunc)
-  all_trunc = np.squeeze(all_trunc)
-  return  pd.DataFrame(data=all_trunc,columns=df.keys())
 
 #Get total POT
 def get_pot(rootname,treename):
@@ -148,21 +62,21 @@ def get_g4_df(rootname,treename,offset=0):
     return g4,indeces
 
 #Return genie dataframe
-def get_genie_df(rootname,treename):
+def get_genie_df(rootname,treename,branchname,offset=0):
     #Input root and tree name to return dataframe with genie information
-    genie_tree = uproot.open(f'{rootname}:{treename}/Event;1')
-    with uproot.open(f'{rootname}:{treename}/Event;1') as file:
-        keys = file.keys()
+    #Offset for different background types
+    genie_tree = uproot.open(f'{rootname}:{treename}/{branchname};1')
+    keys = genie_tree.keys()
     genie_keys = [key for key in keys if 'genie' in key]
-    genie_keys.append('run')
-    genie_keys.append('subrun')
-    genie_keys.append('event')
+    genie_keys.extend(['run','subrun','event','ccnc_truth'])
     genie = genie_tree.arrays(genie_keys,library='pd')
-    runs = list(genie.loc[:,'run'])
-    subruns = list(genie.loc[:,'subrun'])
-    events = list(genie.loc[:,'event'])
+    if isinstance(genie,tuple):
+      #assume only two dfs in tuple
+      genie = pd.merge(left=genie[0],right=genie[1],how='outer')
+    genie.loc[:,'run'] = genie.loc[:,'run']+offset
     genie = genie.set_index(['run','subrun','event'])
     indeces = list(genie.index.values) 
+    genie = genie.sort_index()
     return genie,indeces
 
 #Return dataframe keys
@@ -193,15 +107,21 @@ def number_events(df):
     #Return number of events in a dataframe
     return df.index.drop_duplicates().shape[0]
 
-def get_pot_normalized_df(df,target_pot,pot,events,seed=420):
+def get_pot_normalized_df(df,target_pot,pot,events,seed=420,pot_per_event=-1):
   #Return dataframe with randomly selected events, normalized to target pot
   #Also returns total number of events
   np.random.seed(seed)
-  n_keep = int(np.round(target_pot/pot*events))
+  #print(int(np.round(target_pot/pot*events)),int(np.round(target_pot/pot_per_event)))
+  if pot_per_event == -1:
+    n_keep = int(np.round(target_pot/pot*events))
+  else:
+    n_keep = int(np.round(target_pot/pot_per_event))
   n_drop = events - n_keep
+  #print(n_drop)
   if n_drop < 0:
     raise Exception('You need more events chief!')
   index = df.index.drop_duplicates()
+  #print(n_drop)
   drop_indices = np.random.choice(index, n_drop, replace=False)
   return df.drop(drop_indices),n_keep
 
@@ -223,7 +143,7 @@ def get_eventype_count(df,pdg,pdg_key='genie_primaries_pdg'):
   return cnt,has_pdg,cnt/events
 
 def calc_thetat(df,method=0,return_key='theta_t',theta_xz_key='theta_xz',theta_yz_key='theta_yz',
-px_key='genie_Px',py_key='genie_Py',pz_key='genie_Pz',p_key='genie_P'):
+px_key='genie_Px',py_key='genie_Py',pz_key='genie_Pz'):
   #Calculate transverse angle (off z-axis) for given dataframe, appends it to dataframe
   #Method 0 is using angles
   #Method 1 is using momenta
@@ -240,12 +160,53 @@ px_key='genie_Px',py_key='genie_Py',pz_key='genie_Pz',p_key='genie_P'):
     px = df.loc[:,px_key].values
     py = df.loc[:,py_key].values
     pz = df.loc[:,pz_key].values
-    if p_key == 'None':
-      p = sqrt(px**2+py**2+pz**2)
+    thetat = arctan(sqrt(px**2+py**2)/pz)
+
+  df.loc[:,return_key] = abs(thetat)
+  return df
+def calc_thetave(df,return_key='theta_ve',status_key='genie_status_code',E_key='genie_Eng',pdg_key='genie_primaries_pdg',
+                method=0):
+  #Use marina's (docDB:25206) method for calculating the angle, use the neutrino truth energy
+  indeces = df.index.drop_duplicates()
+  nu_pdgs = (12,-12,14,-14)
+  for ind in indeces:
+    row = df.loc[ind]
+    #print(row)
+    status = list(row[status_key])
+    pdgs = list(row[pdg_key])
+    Es = list(row[E_key])
+
+    thetas = np.full(len(row),-9999.) #Label where neutrino and electron are
+
+    #Dumby vars
+    T_e = -9999
+    E_e = -9999
+    p_e = -9999
+    E_nu = -9999
+    #Check which index is the incoming neutirno
+    for i,l in enumerate(np.array([status,pdgs,Es]).T):
+      if l[0] == 0 and l[1] in nu_pdgs: #Incoming neutrino
+        E_nu = l[2]
+      elif l[0] == 1 and abs(l[1]) == 11: #Outgoing electron
+        e_ind = i
+        E_e = l[2]
+        #print(row.iloc[i][E_key],m_e,sqrt(E_e**2-m_e**2))
+        p_e = sqrt(E_e**2-m_e**2)
+        T_e = E_e - m_e
+    #print(E_nu,E_e,m_e,p_e,T_e,thetas)
+    #print(arccos(T_e/p_e*(m_e/E_nu+1)))
+    if T_e == -9999 or E_e == -9999 or p_e == -9999 or E_nu == -9999:
+      #thetas[e_ind] = -9999
+      print(f'Missing electron event for run {ind[0]} subrun {ind[1]} event {ind[2]}')
     else:
-      p = df.loc[:,p_key].values
-    thetat = pi/2 - arccos(sqrt(px**2+py**2)/p)
-  df.loc[:,return_key] = thetat
+      if method == 0:
+        te = arccos(T_e/p_e*(m_e/E_nu+1))
+      elif method == 1: #These are identical
+        te = arccos(E_e/p_e*(1-m_e*(1-T_e/E_nu)/E_e))
+      thetas[e_ind] = te
+      #print(arccos(T_e/p_e*(m_e/E_nu+1)))
+    #print(thetas[4])
+    df.loc[ind,return_key] = np.array(thetas)
   return df
 
 def calc_Etheta(df,return_key='E_theta^2',E_key='genie_Eng',theta_t_key='theta_t'):
@@ -286,23 +247,27 @@ def get_scat_type(df,pdg_key='genie_primaries_pdg',return_key='scat_type'):
 def get_signal_background(scat,back):
   #Get signal to background ratio
   #print(len(list(scat.index.drop_duplicates())),len(list(back.index.drop_duplicates())))
+  #print(len(list(scat.index.drop_duplicates())),len(list(back.index.drop_duplicates())))
   return len(list(scat.index.drop_duplicates()))/len(list(back.index.drop_duplicates()))
 
-def make_cuts(df,pdg_key='genie_primaries_pdg',method=0,Etheta=0.03,Etheta_key='E_theta^2'):
+def make_cuts(df,pdg_key='genie_primaries_pdg',method=0,Etheta=0.003,Etheta_key='E_theta^2'):
   #Make background cuts, returns cut index
   #Method 0: E theta^2 cut
-  e_df = df[df.loc[:,pdg_key] == 11] #Filter by electron
+  e_df = df[abs(df.loc[:,pdg_key]) == 11] #Filter by electron
   indeces = list(e_df.index.drop_duplicates()) #Get event indeces
   keep_indeces = [] #keep indeces if they pass the cut
   for index in indeces:
     if method == 0: #E theta^2 cut
       E_theta = e_df.loc[index,Etheta_key]
-      #print(isinstance(E_theta,np.floating),type(E_theta))
+      #print(E_theta)
+      #print(isinstance(E_theta,np.floating),type(E_theta),index)
       if isinstance(E_theta,np.floating):
-        if e_df.loc[index,Etheta_key] < Etheta: #Less than cutoff
+        #print(index,E_theta,Etheta,E_theta < Etheta)
+        if E_theta < Etheta: #Less than cutoff
           keep_indeces.append(index)
-      else:
-        if e_df.loc[index,Etheta_key].values[0] < Etheta: #Less than cutoff
+      else: #handle initial electron
+        e_temp = e_df[e_df.loc[:,'genie_status_code']!=0] #Don't use initial electron
+        if e_temp.loc[index,Etheta_key] < Etheta: #Less than cutoff
           #print(e_df.loc[index,Etheta_key].values[0] < Etheta,Etheta,e_df.loc[index,Etheta_key].values[0])
           keep_indeces.append(index)
   
@@ -316,7 +281,8 @@ def get_electron_count(df,pdg_key='genie_primaries_pdg',return_key='e_count',dro
   drop_index = [] #Drop indeces with multiple electrons
   for index in indeces:
     temp_df = df.loc[index]
-    pdgs = list(temp_df.loc[:,pdg_key].values)
+    #temp_df = temp_df[temp_df.loc[:,'genie_status_code']!=0] #Get rid of initial electron
+    pdgs = list(abs(temp_df.loc[:,pdg_key].values))
     es = pdgs.count(11) #Number of electrons
     if drop_duplicates and es > 1:
       drop_index.append(index)
@@ -355,6 +321,107 @@ def get_shw_df(rootname,treename,offset=0):
     indeces = list(shw.index.values) 
     return shw,indeces
   
-def drop_initial_e(df,pdg_key='genie_primaries_pdg',p_key='genie_P',small=1e-5):
-  good_inds = ~((df[pdg_key] == 11) & (df[p_key] < small).values)
+def drop_initial_e(df,pdg_key='genie_primaries_pdg',p_key='genie_P',status_key='genie_status_code',small=1e-5,method=1):
+  if method == 0:
+    good_inds = ~((df[pdg_key] == 11) & (df[p_key] < small).values) #Has small momentum
+  elif method == 1:
+    good_inds = ~((df[pdg_key] == 11) & (df[status_key] == 0).values) #Is initial part.
   return df.loc[good_inds]
+
+def cut_pdg_event_ak(ak,pdg,pdg_key='genie_primaries_pdg',eng_key='genie_Eng',E_threshold=0,exclude=True):
+  #Exclude true to remove events with pdg, otherwise we'll include
+  keep_inds = [] #Keep indeces, if exclude is false this becomes remove inds
+  for ind,row in enumerate(ak):
+    pdg_inds = [i for i,val in enumerate(row[pdg_key]) if abs(val) == pdg] #find locations of pdgs
+    if len(pdg_inds) == 0: #This means there are none of this pdg, continue 
+      keep_inds.append(ind)
+      continue
+    if len([x for x in row[eng_key][pdg_inds] if x >= E_threshold]) == 0: #An event exceeding threshold E
+      keep_inds.append(ind)
+  if ~exclude:
+    remove_inds = keep_inds
+    #keep_inds = [] #Clear just in case
+    all_inds = list(range(len(ak)))
+    keep_inds = [x for x in all_inds if x not in remove_inds] #Redefine keep_inds
+  return ak[keep_inds]
+
+def cut_ccnc_event_ak(ak,ccnc=0,ccnc_key='ccnc_truth'):
+  #Keep only cc events if cc = 0, otherwise only keep nc events
+  keep_inds = []
+  for ind,row in enumerate(ak):
+    if row[ccnc_key] == ccnc:
+      keep_inds.append(ind)
+  return ak[keep_inds]
+
+def cut_pdg_event(df,pdg,pdg_key='genie_primaries_pdg',eng_key='genie_Eng',m_key='genie_mass',E_threshold=0,exclude=True,
+                max_count=1,check_antiparticle=True):
+  #Exclude true to remove events with pdg, otherwise we'll include
+  #Max count is max number of events allowed
+  drop_inds = []
+  indeces = list(df.index.drop_duplicates()) #Get run info for each event
+  prev_ind = indeces[0]
+  cnt = 0
+  start = time()
+  for ind in indeces:
+    row = df.loc[ind]
+    #row.sort_index()
+    row = row[row.loc[:,'genie_status_code'] == 1]
+    pdgs = row[pdg_key].to_numpy()
+    Es = row[eng_key].to_numpy()
+    ms = row[m_key].to_numpy()
+    Ts = Es-ms #Kinetic energy less than threshold
+    # if cnt % 100 == 0:
+    #   end = time()
+    #   print(f'{ind},{cnt},{end-start:.2f}')
+    #   start = time()
+    # if cnt %1000 == 0 and cnt != 0:
+    #   break
+    # cnt+=1
+    #print(row
+    if check_antiparticle:
+      pdg_inds = [i for i,val in enumerate(pdgs) if abs(val) == pdg] #find locations of pdgs
+    else:
+      pdg_inds = [i for i,val in enumerate(pdgs) if val == pdg] #find locations of pdgs
+    if len(pdg_inds) == 0: #This means there are none of this pdg, continue 
+      continue
+    #print(Ts,pdgs)
+    #break
+    if len([x for x in Ts if x >= E_threshold]) >= max_count: #An event exceeding threshold E
+      drop_inds.append(ind)
+    
+    
+  if not exclude: #Switch this to inds we want to keep
+    df = df.loc[drop_inds]
+  else:
+    df = df.drop(drop_inds)
+  return df
+
+def find_hadron_activity(df,pdg_key='genie_primaries_pdg',drop=False,drop_type=0):
+  #Determine if event has hadron activity, some events didn't
+  #Drop type 0: drop events with no activity, type 1: drop events with activity
+  indeces = list(df.index.drop_duplicates()) #Get run info for each event
+  hadron_active = []
+  drop_inds = []
+  for i,ind in enumerate(indeces):
+    row = df.loc[ind]
+    pdgs = row[pdg_key].to_numpy()
+    atoms = []
+    for pdg in pdgs:
+      #print(len(str(pdg)),str(pdg)[0])
+      if len(str(pdg)) == 10 and str(pdg)[0] == str(1):
+        atoms.append(pdg)
+    if atoms[0] == atoms[1]:
+      hadron_active.extend(np.full(len(row),0)) #No activity, probably nu e scattering
+      if drop and drop_type == 0:
+        drop_inds.append(ind)
+    else:
+      hadron_active.extend(np.full(len(row),1)) #Activity
+      if drop and drop_type == 1:
+        drop_inds.append(ind)
+  df.loc[:,'hadron_activity'] = hadron_active
+  return df.drop(drop_inds)
+
+    
+  
+
+

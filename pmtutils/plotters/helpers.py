@@ -79,12 +79,18 @@ def max_bin_height(ax,bins):
       max_bin = bar.get_height()
   return max_bin
 
-def make_lines():
+def make_lines(mark_borders=False):
   plt.axhline(y=62.5,linestyle='--',linewidth=3)
   plt.axhline(y=-62.5,linestyle='--',linewidth=3)
   plt.axvline(x=125,linestyle='--',linewidth=3)
   plt.axvline(x=250,linestyle='--',linewidth=3)
   plt.axvline(x=375,linestyle='--',linewidth=3)
+  if mark_borders:
+    plt.axvline(x=500,linestyle='--',linewidth=3)
+    plt.axvline(x=0,linestyle='--',linewidth=3)
+    plt.axhline(y=200,linestyle='--',linewidth=3)
+    plt.axhline(y=-200,linestyle='--',linewidth=3)
+
 
 def kde_1dhist(df,titles,xlabels,ylabels,keys,show,save,save_name,fit_gaus,trim_outliers):
   #Make kde plots
@@ -140,7 +146,8 @@ def kde_1dhist(df,titles,xlabels,ylabels,keys,show,save,save_name,fit_gaus,trim_
       plt.close(fig)
 
 def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False,
-            normalize=False,facecolor='cyan'):
+            normalize=False,facecolor='cyan',det_key='ophit_ch',mark_borders=False,
+            make_colorbar=False):
   #If coating is 2, plot both, coating 0 for coated, coating 1 for uncoated
   if df.shape[0] != 120:
     print('df needs to contain only one event, or combined events')
@@ -154,7 +161,7 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
   fig = plt.figure(figsize=(10,8))
   ax = fig.add_subplot()
   ax.set_facecolor(facecolor)
-  make_lines()
+  make_lines(mark_borders)
 
 
 
@@ -162,7 +169,7 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
   for _,line in df.iterrows():
     skip = False #Skips text for PMTs that are filtered
     det_type = int(line['ophit_opdet_type'])
-    det_ch = str(int(line['ophit_ch']))
+    det_ch = str(int(line[det_key]))
     x = line['ophit_opdet_x']
     y = line['ophit_opdet_y']
     z = line['ophit_opdet_z']
@@ -217,9 +224,10 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
       data_points[:,3] = data_points[:,3]/data_points[:,3].sum()
   sc = ax.scatter(data_points[:,2],data_points[:,1],c=data_points[:,3],cmap=cmap,s=80,alpha=0.7)
   #ax.margins(x=0.05)
-  #divider = make_axes_locatable(ax)
-  #cax = divider.append_axes("right", size="5%", pad=0.05)
-  #cbar = fig.colorbar(sc,cax=cax,ax=ax)
+  if make_colorbar:
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = fig.colorbar(sc,cax=cax,ax=ax)
   #cbar.set_label(f'{label_title}',rotation=270,fontsize=xls)
   ax.set_xlabel('Z [cm]',fontsize=xls)
   ax.set_ylabel('Y [cm]',fontsize=xls)
