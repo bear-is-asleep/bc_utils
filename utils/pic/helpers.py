@@ -9,6 +9,7 @@ from scipy import optimize
 from sklearn.linear_model import LinearRegression
 from numpy import isin, sqrt,exp,arctan,cos,sin,pi
 from time import time
+from random import randint
 
 #Constants
 
@@ -123,4 +124,16 @@ def get_central_arr(arr,nleft,nright=None):
     nright = nleft
   length = len(arr)
   return arr[int(length/2)-nleft:int(length/2)+nright]
+
+def isbetween(x,lower,upper): #Return true if x is between lower and upper
+  if x > lower and x < upper:
+    return True
+  return False
+
+def get_random_colors(n):
+  color = []
+
+  for i in range(n):
+    color.append('#%06X' % randint(0, 0xFFFFFF))
+  return color
 

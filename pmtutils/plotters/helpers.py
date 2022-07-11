@@ -146,12 +146,14 @@ def kde_1dhist(df,titles,xlabels,ylabels,keys,show,save,save_name,fit_gaus,trim_
       plt.close(fig)
 
 def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False,
-            normalize=False,facecolor='cyan',det_key='ophit_ch',mark_borders=False,
-            make_colorbar=False):
+            normalize=False,facecolor='#98F5FF',det_key='ophit_opdet',mark_borders=False,
+            make_colorbar=False,label_channels=True,invert_xaxis=False,small=small):
   #If coating is 2, plot both, coating 0 for coated, coating 1 for uncoated
   if df.shape[0] != 120:
     print('df needs to contain only one event, or combined events')
     return None
+  if invert_xaxis:
+    small = 1.2*small
 
 
   #plt.figure()
@@ -169,7 +171,7 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
   for _,line in df.iterrows():
     skip = False #Skips text for PMTs that are filtered
     det_type = int(line['ophit_opdet_type'])
-    det_ch = str(int(line[det_key]))
+    det_ch = str(line[det_key])
     x = line['ophit_opdet_x']
     y = line['ophit_opdet_y']
     z = line['ophit_opdet_z']
@@ -185,16 +187,17 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
         if det_type == coating:
           data_points.append(data_line)
           skip = True #Keeps good PMTs
-      if z > 250 and skip:
-        if det_ch == 166 or det_ch == 160:
-          ax.text(z-2*small,y-2*small,det_ch,fontsize=tbs)
-        else:
-          ax.text(z-2*small,y+small,det_ch,fontsize=tbs)
-      if z < 250 and skip:
-        if det_ch == 150 or det_ch == 156:
-          ax.text(z+0.15*small,y-2*small,det_ch,fontsize=tbs)
-        else:
-          ax.text(z+0.15*small,y+small,det_ch,fontsize=tbs)
+      if label_channels:
+        if z > 250 and skip:
+          if det_ch == 166 or det_ch == 160:
+            ax.text(z-2*small,y-2*small,det_ch,fontsize=tbs)
+          else:
+            ax.text(z-2*small,y+small,det_ch,fontsize=tbs)
+        if z < 250 and skip:
+          if det_ch == 150 or det_ch == 156:
+            ax.text(z+0.15*small,y-2*small,det_ch,fontsize=tbs)
+          else:
+            ax.text(z+0.15*small,y+small,det_ch,fontsize=tbs)
     
     if tpc == 1 and x > 0: #186 included (for some reason)
       #Apply coating cut
@@ -206,16 +209,17 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
         if det_type == coating:
           data_points.append(data_line)
           skip = True #Keeps good PMTs
-      if z > 250 and skip: 
-        if det_ch == 166 or det_ch == 160:
-          ax.text(z-2*small,y-2*small,det_ch,fontsize=tbs)
-        else:
-          ax.text(z-2*small,y+small,det_ch,fontsize=tbs)
-      if z < 250 and skip:
-        if det_ch == 150 or det_ch == 156:
-          ax.text(z+0.15*small,y-2*small,det_ch,fontsize=tbs)
-        else:
-          ax.text(z+0.15*small,y+small,det_ch,fontsize=tbs)
+      if label_channels:
+        if z > 250 and skip: 
+          if det_ch == 166 or det_ch == 160:
+            ax.text(z-2*small,y-2*small,det_ch,fontsize=tbs)
+          else:
+            ax.text(z-2*small,y+small,det_ch,fontsize=tbs)
+        if z < 250 and skip:
+          if det_ch == 150 or det_ch == 156:
+            ax.text(z+0.15*small,y-2*small,det_ch,fontsize=tbs)
+          else:
+            ax.text(z+0.15*small,y+small,det_ch,fontsize=tbs)
 
   data_points = np.asarray(data_points)
   #print(data_points[:,3])
@@ -231,7 +235,13 @@ def plot_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plot=False
   #cbar.set_label(f'{label_title}',rotation=270,fontsize=xls)
   ax.set_xlabel('Z [cm]',fontsize=xls)
   ax.set_ylabel('Y [cm]',fontsize=xls)
-  ax.set_title(f'{label_title} TPC{tpc}',fontsize = tls)
+  #ax.set_title(f'{label_title} TPC{tpc}',fontsize = tls)
+  if tpc == 0:
+    ax.set_title(f'{label_title} West APA Back',fontsize = tls)
+  elif tpc == 1:
+    ax.set_title(f'{label_title} East APA Back',fontsize = tls)
+  if invert_xaxis:
+    ax.invert_xaxis()
   if return_plot:
     return fig,ax,sc
   else:
@@ -663,6 +673,96 @@ def interactive_TPC(tpc,label,label_title,df,coating=2,cmap='viridis',return_plo
     return fig,ax,sc,cax
   else:
     return fig,ax
+
+def plot_g4_muon(g4,muon,index,thigh,tlow,small=20,x='z',y='y',save_fig=False,display_run_info=True,n=50):
+  #g4 and muon are the dataframes for this info
+  #index is (run,subrun,event)
+  #thigh and tlow are treadout maximum and maximum (see get_treadout in pmtutils)
+  #x and y are axes to plot
+  #Run info
+  run = index[0]
+  subrun = index[1]
+  event = index[2]
+  
+  if display_run_info:
+    run_info = f'Run: {run} Subrun: {subrun} Event: {event}'
+  else:
+    run_info = ''
+
+  fig = plt.figure(figsize=(9,7))
+  ax = fig.add_subplot()
+
+  #Keep single event
+  gtemp = g4.loc[index,:]
+  mtemp = muon.loc[index,:]
+
+  #Get list of random colors from utils
+  color = pic.get_random_colors(n) #Default to 50
+
+  #Populate g4
+  gxs = [[]]
+  gys = [[]]
+  if isinstance(gtemp,pd.core.series.Series):
+    use_iloc = False #Determines if we need to use ilov, only use on dataframe (not series)
+    gxs.append([gtemp[f'StartPoint{x}'],gtemp[f'EndPoint{x}']])
+    gys.append([gtemp[f'StartPoint{y}'],gtemp[f'EndPoint{y}']])
+  else:
+    for _,row in gtemp.iterrows():
+      gxs.append([row[f'StartPoint{x}'],row[f'EndPoint{x}']])
+      gys.append([row[f'StartPoint{y}'],row[f'EndPoint{y}']])
+  gxs.pop(0); gys.pop(0) #Delete extra
+
+  #Populate muons
+  mxs = [[]]
+  mys = [[]]
+  if isinstance(mtemp,pd.core.series.Series): #theres only one track
+    mxs.append([mtemp[f'muontrk_{x}1'],mtemp[f'muontrk_{x}2']])
+    mys.append([mtemp[f'muontrk_{y}1'],mtemp[f'muontrk_{y}2']])
+  else:
+    for line,row in mtemp.iterrows(): #iterate through all tracks
+      mxs.append([row[f'muontrk_{x}1'],row[f'muontrk_{x}2']])
+      mys.append([row[f'muontrk_{y}1'],row[f'muontrk_{y}2']])
+  mxs.pop(0); mys.pop(0)
+  for i in range(len(mxs)):#iterate through all tracks, labeling one
+    if i ==0:
+      ax.plot(mxs[i],mys[i],linewidth=10,alpha=0.5,label='Muon Tracks')
+    else:
+      ax.plot(mxs,mys,linewidth=10,alpha=0.5)
+    ax.text(mxs[i][0],mys[i][0],f'{mtemp["muontrk_type"]:.0f}',fontsize=14) #track type label
+  for i in range(len(gxs)): #iterate through all g4 tracks, lableing one
+    if i  == 0:
+      ax.plot(gxs[i],gys[i],ls='--',c=color[i],label='G4 Tracks')
+    else:
+      ax.plot(gxs[i],gys[i],ls='--',c=color[i])
+    if use_iloc:
+        ax.scatter(gtemp.iloc[i][f'det{x}'],gtemp.iloc[i][f'det{y}'],s=100,marker='s',c=color[i])
+    else:
+      ax.scatter(gtemp[f'det{x}'],gtemp[f'det{y}'],s=100,marker='s',c=color[i])
+    
+
+  ax.legend(fontsize=14)
+  ax.set_xlabel(f'{x} [cm]',fontsize=16)
+  ax.set_ylabel(f'{y} [cm]',fontsize=16)
+
+  ax.set_title(r'Tracks $t_r \in$' + f'[{tlow},{thigh}] ms\n'+run_info,fontsize=20)
+  if x == 'x':
+    ax.axvline(0,linewidth=11,color='black')
+    ax.text(-50,100,r'CPA$\rightarrow$',fontsize=16)
+    ax.set_xlim([-200-small,200+small]);
+  if y == 'x':
+    ax.axhline(0,linewidth=11,color='black')
+    ax.text(100,-50,r'CPA$\uparrow$',fontsize=16)
+    ax.set_ylim([-200-small,200+small]);
+  if x == 'z':
+    ax.set_xlim([0-small,500+small])
+  if y == 'y':
+    ax.set_ylim([-200-small,200+small]);
+  if y == 'z':
+    ax.set_ylim([0-small,500+small]);
+  if save_fig:
+    plotters.save_plot(f'g4_muontrks_{y}{x}_event{run:.0f}{subrun:.0f}{event:.0f}')
+    plt.close()
+
 
 
 

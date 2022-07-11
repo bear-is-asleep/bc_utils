@@ -11,6 +11,7 @@ from scipy import optimize
 from sklearn.linear_model import LinearRegression
 from numpy import isin, sqrt,exp,arctan,cos,sin,pi
 from time import time
+from utils import pic
 
 #Constants
 hc = 1240 #eV nm
@@ -47,6 +48,256 @@ E_ws = 0.5 #Assume same as PMT coating
 e_ws = 0.5 #Shifting efficiency TPB
 Ref_cov = 4*5/A #Area of inner surface covered by TPB coated reflective surfaces
 dEdx = 2.2 #MeV/cm check later
+
+#MAPPING to installation labels
+channel_mapping = {
+  6: ['C','C33'], #Bottom right
+  60: ['C','C31'], #Bottom left
+  36: ['C','C22'], #Center
+  62: ['C','C11'], #Top left
+  8: ['C','C13'], #Top right
+  10: ['B','B33'], #Bottom right
+  64: ['B','B31'], #Bottom left
+  38: ['B','B22'], #Center
+  66: ['B','B11'], #Top left
+  12: ['B','B13'], #Top right
+  14: ['A','A33'], #Bottom right
+  68: ['A','A31'], #Bottom left
+  40: ['A','A22'], #Center
+  70: ['A','A11'], #Top left
+  16: ['A','A13'], #Top right
+  84: ['F','F33'], #Bottom right
+  138: ['F','F31'], #Bottom left
+  114: ['F','F22'], #Center
+  140: ['F','F11'], #Top left
+  86: ['F','F13'], #Top right
+  88: ['E','E33'], #Bottom right
+  142: ['E','E31'], #Bottom left
+  116: ['E','E22'], #Center
+  144: ['E','E11'], #Top left
+  90: ['E','E13'], #Top right
+  92: ['D','D33'], #Bottom right
+  146: ['D','D31'], #Bottom left
+  118: ['D','D22'], #Center
+  148: ['D','D11'], #Top left
+  94: ['D','D13'], #Top right
+  162: ['I','I33'], #Bottom right
+  216: ['I','I31'], #Bottom left
+  192: ['I','I22'], #Center
+  218: ['I','I11'], #Top left
+  164: ['I','I13'], #Top right
+  166: ['H','H33'], #Bottom right
+  220: ['H','H31'], #Bottom left
+  194: ['H','H22'], #Center
+  222: ['H','H11'], #Top left
+  168: ['H','H13'], #Top right
+  170: ['G','G33'], #Bottom right
+  224: ['G','G31'], #Bottom left
+  196: ['G','G22'], #Center
+  226: ['G','G11'], #Top left
+  172: ['G','G13'], #Top right
+  240: ['L','L33'], #Bottom right
+  294: ['L','L31'], #Bottom left
+  270: ['L','L22'], #Center
+  296: ['L','L11'], #Top left
+  242: ['L','L13'], #Top right
+  244: ['K','K33'], #Bottom right
+  298: ['K','K31'], #Bottom left
+  272: ['K','K22'], #Center
+  300: ['K','K11'], #Top left
+  246: ['K','K13'], #Top right
+  248: ['J','J33'], #Bottom right
+  302: ['J','J31'], #Bottom left
+  274: ['J','J22'], #Center
+  304: ['J','J11'], #Top left
+  250: ['J','J13'], #Top right
+  #X - O
+  #W N  V M  S P  T Q  U R
+  61: ['X','X33'], #Bottom right
+  7: ['X','X31'], #Bottom left
+  37: ['X','X22'], #Center
+  9: ['X','X11'], #Top left
+  63: ['X','X13'], #Top right
+  65: ['W','W33'], #Bottom right
+  11: ['W','W31'], #Bottom left
+  39: ['W','W22'], #Center
+  13: ['W','W11'], #Top left
+  67: ['W','W13'], #Top right
+  69: ['V','V33'], #Bottom right
+  15: ['V','V31'], #Bottom left
+  41: ['V','V22'], #Center
+  17: ['V','V11'], #Top left
+  71: ['V','V13'], #Top right
+  139: ['U','U33'], #Bottom right
+  85: ['U','U31'], #Bottom left
+  115: ['U','U22'], #Center
+  87: ['U','U11'], #Top left
+  141: ['U','U13'], #Top right
+  143: ['T','T33'], #Bottom right
+  89: ['T','T31'], #Bottom left
+  117: ['T','T22'], #Center
+  91: ['T','T11'], #Top left
+  145: ['T','T13'], #Top right
+  147: ['S','S33'], #Bottom right
+  93: ['S','S31'], #Bottom left
+  119: ['S','S22'], #Center
+  95: ['S','S11'], #Top left
+  149: ['S','S13'], #Top right
+  217: ['R','R33'], #Bottom right
+  163: ['R','R31'], #Bottom left
+  193: ['R','R22'], #Center
+  165: ['R','R11'], #Top left
+  219: ['R','R13'], #Top right
+  221: ['Q','Q33'], #Bottom right
+  167: ['Q','Q31'], #Bottom left
+  195: ['Q','Q22'], #Center
+  169: ['Q','Q11'], #Top left
+  223: ['Q','Q13'], #Top right
+  225: ['P','P33'], #Bottom right
+  171: ['P','P31'], #Bottom left
+  197: ['P','P22'], #Center
+  173: ['P','P11'], #Top left
+  227: ['P','P13'], #Top right
+  295: ['O','O33'], #Bottom right
+  241: ['O','O31'], #Bottom left
+  271: ['O','O22'], #Center
+  243: ['O','O11'], #Top left
+  297: ['O','O13'], #Top right
+  299: ['N','N33'], #Bottom right
+  245: ['N','N31'], #Bottom left
+  273: ['N','N22'], #Center
+  247: ['N','N11'], #Top left
+  301: ['N','N13'], #Top right
+  303: ['M','M33'], #Bottom right
+  249: ['M','M31'], #Bottom left
+  275: ['M','M22'], #Center
+  251: ['M','M11'], #Top left
+  305: ['M','M13'] #Top right
+  #X - O
+  #W N  V M  S P  T Q  U R
+}
+
+# channel_mapping = {6: ['C', 'C33'],
+#  60: ['C', 'C31'],
+#  36: ['C', 'C22'],
+#  62: ['C', 'C11'],
+#  8: ['C', 'C13'],
+#  10: ['B', 'B33'],
+#  64: ['B', 'B31'],
+#  38: ['B', 'B22'],
+#  66: ['B', 'B11'],
+#  12: ['B', 'B13'],
+#  14: ['A', 'A33'],
+#  68: ['A', 'A31'],
+#  40: ['A', 'A22'],
+#  70: ['A', 'A11'],
+#  16: ['A', 'A13'],
+#  84: ['F', 'F33'],
+#  138: ['F', 'F31'],
+#  114: ['F', 'F22'],
+#  140: ['F', 'F11'],
+#  86: ['F', 'F13'],
+#  88: ['E', 'E33'],
+#  142: ['E', 'E31'],
+#  116: ['E', 'E22'],
+#  144: ['E', 'E11'],
+#  90: ['E', 'E13'],
+#  92: ['D', 'D33'],
+#  146: ['D', 'D31'],
+#  118: ['D', 'D22'],
+#  148: ['D', 'D11'],
+#  94: ['D', 'D13'],
+#  162: ['I', 'I33'],
+#  216: ['I', 'I31'],
+#  192: ['I', 'I22'],
+#  218: ['I', 'I11'],
+#  164: ['I', 'I13'],
+#  166: ['H', 'H33'],
+#  220: ['H', 'H31'],
+#  194: ['H', 'H22'],
+#  222: ['H', 'H11'],
+#  168: ['H', 'H13'],
+#  170: ['G', 'G33'],
+#  224: ['G', 'G31'],
+#  196: ['G', 'G22'],
+#  226: ['G', 'G11'],
+#  172: ['G', 'G13'],
+#  240: ['L', 'L33'],
+#  294: ['L', 'L31'],
+#  270: ['L', 'L22'],
+#  296: ['L', 'L11'],
+#  242: ['L', 'L13'],
+#  244: ['K', 'K33'],
+#  298: ['K', 'K31'],
+#  272: ['K', 'K22'],
+#  300: ['K', 'K11'],
+#  246: ['K', 'K13'],
+#  248: ['J', 'J33'],
+#  302: ['J', 'J31'],
+#  274: ['J', 'J22'],
+#  304: ['J', 'J11'],
+#  250: ['J', 'J13'],
+#  7: ['X', 'X33'],
+#  61: ['X', 'X31'],
+#  37: ['X', 'X22'],
+#  63: ['X', 'X11'],
+#  9: ['X', 'X13'],
+#  11: ['W', 'W33'],
+#  65: ['W', 'W31'],
+#  39: ['W', 'W22'],
+#  67: ['W', 'W11'],
+#  13: ['W', 'W13'],
+#  15: ['V', 'V31'],
+#  69: ['V', 'V33'],
+#  41: ['V', 'V22'],
+#  71: ['V', 'V13'],
+#  17: ['V', 'V11'],
+#  85: ['U', 'U31'],
+#  139: ['U', 'U33'],
+#  115: ['U', 'U22'],
+#  141: ['U', 'U13'],
+#  87: ['U', 'U11'],
+#  89: ['T', 'T31'],
+#  143: ['T', 'T33'],
+#  117: ['T', 'T22'],
+#  145: ['T', 'T13'],
+#  91: ['T', 'T11'],
+#  93: ['S', 'S31'],
+#  147: ['S', 'S33'],
+#  119: ['S', 'S22'],
+#  149: ['S', 'S13'],
+#  95: ['S', 'S11'],
+#  163: ['R', 'R31'],
+#  217: ['R', 'R33'],
+#  193: ['R', 'R22'],
+#  219: ['R', 'R13'],
+#  165: ['R', 'R11'],
+#  167: ['Q', 'Q31'],
+#  221: ['Q', 'Q33'],
+#  195: ['Q', 'Q22'],
+#  223: ['Q', 'Q13'],
+#  169: ['Q', 'Q11'],
+#  171: ['P', 'P31'],
+#  225: ['P', 'P33'],
+#  197: ['P', 'P22'],
+#  227: ['P', 'P13'],
+#  173: ['P', 'P11'],
+#  241: ['O', 'O31'],
+#  295: ['O', 'O33'],
+#  271: ['O', 'O22'],
+#  297: ['O', 'O13'],
+#  243: ['O', 'O11'],
+#  245: ['N', 'N31'],
+#  299: ['N', 'N33'],
+#  273: ['N', 'N22'],
+#  301: ['N', 'N13'],
+#  247: ['N', 'N11'],
+#  249: ['M', 'M31'],
+#  303: ['M', 'M33'],
+#  275: ['M', 'M22'],
+#  305: ['M', 'M13'],
+#  251: ['M', 'M11']}
+
 
 #Gaussian fit
 def gaussian(x,a, mean, stddev):
@@ -1014,4 +1265,103 @@ def get_peakT(op_df,pmts,tpc,index,bw,number_pmts=10,thresholdPE=1,convert_to_ed
       else: 
         return peakT
   #return -9999 #Return if the peakT threshold is not found
+
+def find_cosmicentrance(df,return_keyx='detx',return_keyy='dety',return_keyz='detz',x_key='StartPointx',y_key='StartPointy',z_key='StartPointz',
+  theta_yx_key='theta_yx',theta_xz_key='theta_xz',theta_yz_key='theta_yz',E_key='Eng',p_key='P',maxx=200,maxy=200,maxz=500,minx=-200,miny=-200,minz=0,
+  endx_key='EndPointx',endy_key='EndPointy',endz_key='EndPointz',method=0): #Find where g4 particle enters detector (cosmic)
+  #Get vars
+  xs = df.loc[:,x_key] #cm
+  ys = df.loc[:,y_key]
+  zs = df.loc[:,z_key]
+  endxs = df.loc[:,endx_key] #cm
+  endys = df.loc[:,endy_key]
+  endzs = df.loc[:,endz_key]
+  if method == 0: #Use momentum to get angles
+    theta_yxs = df.loc[:,theta_yx_key]
+    theta_yzs = df.loc[:,theta_yz_key]
+    theta_xzs = df.loc[:,theta_xz_key]
+  elif method == 1:
+    theta_xzs = np.arctan((endxs-xs)/(endzs-zs))
+    theta_yzs = np.arctan((endys-ys)/(endzs-zs))
+    theta_yxs = np.arctan((endys-ys)/(endxs-xs))
+
+  #Initialize variables
+  t_drifts = np.zeros(xs.shape)
+  t_enters = np.zeros(xs.shape)
+  endxs = np.zeros(xs.shape)
+  endys = np.zeros(xs.shape)
+  endzs = np.zeros(xs.shape)
+  found_cosmic = False
+
+  for i in range(len(xs)):
+    endy = 200
+    theta_yx = theta_yxs.iloc[i]
+    theta_yz = theta_yzs.iloc[i]
+    theta_xz = theta_xzs.iloc[i]
+    x = xs.iloc[i]
+    y = ys.iloc[i]
+    z = zs.iloc[i]
+
+    endz = z + (endy-y)*(1/np.tan(theta_yz))
+    endx = x + (endy-y)*(1/np.tan(theta_yx))
+    #print(endx,endy,endz,pic.isbetween(endz,minz,maxz) and pic.isbetween(endx,minx,maxx))
+    if pic.isbetween(endz,minz,maxz) and pic.isbetween(endx,minx,maxx): #Cosmic entered detector at top
+      found_cosmic = True
+      endxs[i] = endx
+      endys[i] = endy
+      endzs[i] = endz
+    else: #Cosmic entered in sides
+      #print('here')
+      #Temporary endpoint checks on 4 side faces
+      tempxs = np.full(4,-9999)
+      tempys = np.full(4,-9999)
+      tempzs = np.full(4,-9999)
+      #Check which face it hits
+      tempxs[0] = minx
+      tempxs[1] = maxx
+      tempzs[2] = minz
+      tempzs[3] = maxz
+      for j in range(4): #Iterate over all cases, select one with largest y-value
+        if j < 2:
+          tempzs[j] = z + (tempxs[j]-x)*(1/np.tan(theta_xz))
+          tempys[j] = y + (tempxs[j]-x)*np.tan(theta_yx)
+          #print(y + (tempxs[j]-x)*np.tan(theta_yx),j,i,x,y,z,tempxs[j],tempys[j],tempzs[j],theta_xz,theta_yx,theta_yz)
+          if pic.isbetween(tempzs[j],minz,maxz) and pic.isbetween(tempys[j],miny,maxy): #Found an interaction
+            found_cosmic = True
+          else: #Set back to dumby values
+            tempxs[j] = -9999
+            tempys[j] = -9999
+            tempzs[j] = -9999
+            ttt = 0
+        else:
+          tempxs[j] = x + (tempzs[j]-z)*np.tan(theta_xz)
+          tempys[j] = y + (tempzs[j]-z)*np.tan(theta_yz)
+          #print(y + (tempzs[j]-z)*np.tan(theta_yz),j)
+          if pic.isbetween(tempxs[j],minx,maxx) and pic.isbetween(tempys[j],miny,maxy): #Found an interaction
+            found_cosmic = True
+          else: #Set back to dumby values
+            tempxs[j] = -9999
+            tempys[j] = -9999
+            tempzs[j] = -9999
+            ttt = 0
+      index = np.argmax(tempys) #Index with max y value, assume this is entrance point
+      #Save entrance points with largest y-value
+      endxs[i] = tempxs[index]
+      endys[i] = tempys[index]
+      endzs[i] = tempzs[index]
+  #Save entrance points and return dataframe
+  #print(found_cosmic)
+  df.loc[:,return_keyx] = endxs
+  df.loc[:,return_keyy] = endys
+  df.loc[:,return_keyz] = endzs
+  return df
+
+def get_treadout(df,return_key='treadout',x_key='detx',t_key='StartT'): #Need to use find_cosmicentrance to user this
+  #Get readout time of g4 track
+  v_drift = 0.00016 #cm/ns
+  t = df.loc[:,t_key]
+  x = df.loc[:,x_key]
+  df.loc[:,return_key] = t + x/v_drift
+  return df
+
 

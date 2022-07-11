@@ -365,27 +365,13 @@ def cut_pdg_event(df,pdg,pdg_key='genie_primaries_pdg',eng_key='genie_Eng',m_key
   for ind in indeces:
     row = df.loc[ind]
     #row.sort_index()
-    row = row[row.loc[:,'genie_status_code'] == 1]
-    pdgs = row[pdg_key].to_numpy()
+    row = row[row.loc[:,'genie_status_code'] == 1] #Check outgoing final state particles
+    row = row[abs(row.loc[:,pdg_key]) == pdg] #Keep only correct pdg in event
     Es = row[eng_key].to_numpy()
     ms = row[m_key].to_numpy()
     Ts = Es-ms #Kinetic energy less than threshold
-    # if cnt % 100 == 0:
-    #   end = time()
-    #   print(f'{ind},{cnt},{end-start:.2f}')
-    #   start = time()
-    # if cnt %1000 == 0 and cnt != 0:
-    #   break
-    # cnt+=1
-    #print(row
-    if check_antiparticle:
-      pdg_inds = [i for i,val in enumerate(pdgs) if abs(val) == pdg] #find locations of pdgs
-    else:
-      pdg_inds = [i for i,val in enumerate(pdgs) if val == pdg] #find locations of pdgs
-    if len(pdg_inds) == 0: #This means there are none of this pdg, continue 
-      continue
-    #print(Ts,pdgs)
-    #break
+    #print(ind,Ts,Es,ms)
+    #print(ind,[x for x in Ts if x >= E_threshold])
     if len([x for x in Ts if x >= E_threshold]) >= max_count: #An event exceeding threshold E
       drop_inds.append(ind)
     

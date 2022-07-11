@@ -159,10 +159,15 @@ def hist_scattype(df,hist_key,bw=-1,pdg_key='pdg',pdg=11,scat_key='scat_type',ti
 xls = tls = lls =18
 def hist_scatback(scat,back,hist_key,sb=None,nbins=None,pdg_key='genie_primaries_pdg',pdg=11,
   scat_key='scat_type',back_key='background_type',title='',xlabel='',ylabel='',alpha=0.9,scale='linear',
-  bw=None,stacked=False,histtype='bar',pdgs=[11],include_background=True):
+  bw=None,stacked=False,histtype='bar',pdgs=[11],include_background=True,status_code=1,
+  colors=['red','#7FFF00','yellow','cyan','blue'],edgecolor=None):
   #Histogram with background and scattered events overlayed, with each type of scattering and background
   scat_dfs = []
   back_dfs = []
+
+  #Eliminate initial particles to avoid double coutning
+  scat = scat[scat.loc[:,'genie_status_code'] == status_code]
+  back = back[back.loc[:,'genie_status_code'] == status_code]
   for pdg in pdgs:
     scat_dfs.append(scat[abs(scat.loc[:,pdg_key]) == pdg])
     back_dfs.append(back[abs(back.loc[:,pdg_key]) == pdg])
@@ -256,40 +261,33 @@ def hist_scatback(scat,back,hist_key,sb=None,nbins=None,pdg_key='genie_primaries
     parameters['Binwidth']=f'{bw}'
   #print(parameters)
   ptext = plotters.convert_p_str(parameters)
-  props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+  props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
 
-
-  # print(min(nu_mu,default=np.nan),
-  #                 min(nu_e,default=np.nan),
-  #                 min(nubar_mu,default=np.nan),
-  #                 min(nubar_e,default=np.nan),
-  #                 min(cc_1p0pi,default=np.nan),
-  #                 min(cc_0p0pi,default=np.nan))
-  #print(cc_0p0pi)
 
   fig = plt.figure(figsize=(9,7))
   ax = fig.add_subplot()
   #ax.hist(cc_1p0pi,bins=bins,label=r'CC 1$e$1$p$0$\pi$ ($T_p$ < 20 MeV)',alpha=alpha)
-  if not stacked:
+  if not stacked: #Plot each without stacking
     if include_background:
       ax.hist(cc_0p0pi,bins=bins,label=r'CC 1$e$0$p$0$\pi$',alpha=alpha,
-              histtype=histtype)
+              histtype=histtype,c=colors[4],edgecolor=edgecolor)
     ax.hist(nu_mu,bins=bins,label=r'$\nu_\mu + e^-$',alpha=alpha,
-            histtype=histtype)
+            histtype=histtype,c=colors[0],edgecolor=edgecolor)
     ax.hist(nu_e,bins=bins,label=r'$\nu_e + e^-$',alpha=alpha,
-            histtype=histtype)
+            histtype=histtype,c=colors[1],edgecolor=edgecolor)
     ax.hist(nubar_mu,bins=bins,label=r'$\bar{\nu}_\mu + e^-$',alpha=alpha,
-            histtype=histtype)
+            histtype=histtype,c=colors[2],edgecolor=edgecolor)
     ax.hist(nubar_e,bins=bins,label=r'$\bar{\nu}_e + e^-$',alpha=alpha,
-            histtype=histtype)
+            histtype=histtype,c=colors[3],edgecolor=edgecolor)
   else:
     labels = [r'$\nu_\mu + e^-$',r'$\nu_e + e^-$',
               r'$\bar{\nu}_\mu + e^-$',r'$\bar{\nu}_e + e^-$']
     nus = [nu_mu,nu_e,nubar_mu,nubar_e]
-    if include_background:
+    if include_background: #Add background events
       labels.extend([r'CC 1$e$0$p$0$\pi$'])
       nus.append(cc_0p0pi)
-    ax.hist(nus,bins=bins,stacked=stacked,histtype=histtype,label=labels,alpha=alpha)
+    ax.hist(nus[::-1],bins=bins,stacked=stacked,histtype=histtype,label=labels[::-1],
+    alpha=alpha,color=colors[::-1],edgecolor=edgecolor)#[::-1] reverses list
 
   ax.set_xlabel(xlabel,fontsize=xls)
   ax.set_ylabel(ylabel,fontsize=xls)
