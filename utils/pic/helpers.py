@@ -12,6 +12,31 @@ from time import time
 from random import randint
 
 #Constants
+g4_keys = ['no_primaries',
+ 'geant_list_size',
+ 'pdg',
+ 'status',
+ 'Eng',
+ 'EndE',
+ 'Mass',
+ 'Px',
+ 'Py',
+ 'Pz',
+ 'P',
+ 'StartPointx',
+ 'StartPointy',
+ 'StartPointz',
+ 'StartT',
+ 'EndT',
+ 'EndPointx',
+ 'EndPointy',
+ 'EndPointz',
+ 'theta_xz',
+ 'theta_yz',
+ 'pathlen',
+ 'NumberDaughters',
+ 'TrackId',
+ 'Mother'] #G4 keys
 
 #Gaussian fit
 def gaussian(x,a, mean, stddev):

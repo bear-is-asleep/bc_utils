@@ -11,7 +11,7 @@ from scipy import optimize
 from sklearn.linear_model import LinearRegression
 from numpy import isin, sqrt,exp,arctan,cos,sin,pi
 from time import time
-from utils import pic
+from bc_utils.utils import pic
 
 #Constants
 hc = 1240 #eV nm
@@ -1363,5 +1363,77 @@ def get_treadout(df,return_key='treadout',x_key='detx',t_key='StartT'): #Need to
   x = df.loc[:,x_key]
   df.loc[:,return_key] = t + x/v_drift
   return df
+
+def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=-1,xmin=None,xmax=None):
+  #Make kde histogram using dataframe and its key
+  #df is input dataframe
+  #xkey is x axis key to make bin sizes
+  #ykey is y axis to make scale
+  #index is which event we want
+  #bw is bin wdith
+  #pmt specifies which pmt we're looking at: 
+  #0 is coated, 
+  #1 is uncoated, 
+  #-1 is all of them, 
+  #otherwise its the channel (need to include x-arapucas soon)
+  xs = df.loc[index,xkey].sort_index().values
+  ys = df.loc[index,ykey].sort_index().values
+  pmts = df.loc[index,'ophit_opch'].values
+  coatings = df.loc[index,'ophit_opdet_type'].values
+  tpcs = df.loc[index,'op_tpc'].values
+  if xmax == None and xmin == None:
+    binedges = np.arange(xs.min(),xs.max()+bw,bw)
+    trim_edges = False
+  else:
+    binedges = np.arange(xmin,xmax+bw,bw)
+    trim_edges = True #Digitize keeps excess data in extra bins, first and last ones. We should drop these since they're out of the region of interest
+
+  print(binedges.shape)
+
+  check_all = False #Check all pmts will be using if pmt=2
+  check_ch = False #Check only a single chanel
+  if tpc == 2: 
+    check_tpc = False
+    title_tpc = ''
+  else: 
+    check_tpc = True
+    title_tpc = f' TPC{tpc}'
+  if pmt == 0 or pmt == 1: #Use this to 
+    check_coating = True
+    if pmt == 0:
+      title_pmt = ' Coated PMTs '
+    if pmt == 1:
+      title_pmt = ' Uncoated PMTs '
+  else:
+    check_coating = False
+    if pmt == 2:
+      check_all = True
+      title_pmt = ''
+    else:
+      check_ch = True
+      title_pmt = f' PMT{pmt} '
+  #Make title for plots
+  #title = f'PE vs. timing{title_pmt}{title_tpc}\nRun {index[0]}, Subrun {index[1]}, Event {index[2]}'
+  title = f'PE vs. timing{title_pmt}{title_tpc}'
+  y_hist = np.zeros(len(binedges)+1) #Histogram values, add one buffer
+  inds = np.digitize(xs,binedges) #Returns list with indeces where value belongs
+  for i,ind in enumerate(inds):
+    if check_tpc and tpc != tpcs[i]: continue #Skip events with incorrect tpc
+    if check_coating and coatings[i] == pmt: #Make sure we're checking the right coating
+      y_hist[ind] += ys[i] #Add y-val which belongs to this pmt
+    elif check_all:
+      y_hist[ind] += ys[i] #Add y-val which belongs to this pmt
+    elif check_ch and pmts[i] == pmt: #Make sure we're checking the right pmt
+      y_hist[ind] += ys[i] #Add y-val which belongs to this pmt
+  #bincenters = binedges - bw/2 #temp fix of x-axis not being centered
+  bincenters = binedges #temp fix of x-axis not being centered
+  if trim_edges:
+    #Delete first and last elements
+    bincenters = np.delete(bincenters,0)
+    bincenters = np.delete(bincenters,-1)
+    y_hist = np.delete(y_hist,0)
+    y_hist = np.delete(y_hist,-1)
+    tze=32
+  return bincenters,y_hist,title
 
 

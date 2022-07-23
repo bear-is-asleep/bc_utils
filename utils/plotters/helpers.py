@@ -13,6 +13,7 @@ import matplotlib
 from scipy import optimize
 from mpl_toolkits.mplot3d import Axes3D
 from bc_utils.pmtutils import pic
+import matplotlib.markers as mmarkers
 #matplotlib.rcParams['axes.unicode_minus'] = False
 
 xls = 16 #axis size
@@ -49,7 +50,7 @@ def make_plot_dir():
         os.system("mkdir -p Plots_" +day)
         os.system("mv -n Plots_" +day+"/ Plots/")
 
-def save_plot(fname,fig=None,ftype='.jpg',dpi=500,folder_name=f'Plots_{day}'):
+def save_plot(fname,fig=None,ftype='.jpg',dpi=300,folder_name=f'Plots_{day}'):
     os.system(f'mkdir -p Plots/{folder_name}')
     if fig == None:
       plt.savefig(f'{fname}{ftype}',bbox_inches = "tight",dpi=dpi)
@@ -98,3 +99,19 @@ def convert_p_str(parameters):
     else:
       s+= f"{key} = {parameters[key]}\n"
   return s
+
+def mscatter(x,y,ax=None, m=None, **kw):
+    if not ax: ax=plt.gca()
+    sc = ax.scatter(x,y,**kw)
+    if (m is not None) and (len(m)==len(x)):
+        paths = []
+        for marker in m:
+            if isinstance(marker, mmarkers.MarkerStyle):
+                marker_obj = marker
+            else:
+                marker_obj = mmarkers.MarkerStyle(marker)
+            path = marker_obj.get_path().transformed(
+                        marker_obj.get_transform())
+            paths.append(path)
+        sc.set_paths(paths)
+    return sc
