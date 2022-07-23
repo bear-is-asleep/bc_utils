@@ -5,7 +5,9 @@ import pandas as pd
 import os
 from datetime import date
 import sys
-sys.path.append('/sbnd/app/users/brindenc/mypython') #My utils path
+bc_utils_path = '/Users/bearcarlson/python_utils/'
+sbnd_utils_path = '/sbnd/app/users/brindenc/mypython'
+sys.path.append(bc_utils_path) #My utils path
 from bc_utils.pmtutils import plotters as pmtplotters
 from scipy import optimize
 from sklearn.linear_model import LinearRegression
