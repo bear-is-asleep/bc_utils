@@ -181,3 +181,13 @@ def make_images(params,xiter=0,yiter=2,ziter=2.5,eleviter=.02,azimiter=.01,n_ref
 
     #iterate x,y,z
     i += 1
+
+def make_image_gif(folder,root_name):
+  fp_in = f'{root_name}*.png'
+  fp_out = f'{root_name}.gif'
+
+  imgs = glob.glob(folder+fp_in)
+  imgs = pic.sortstrings_numerically(imgs)
+  frames = [Image.open(image) for image in imgs]
+  img = frames[0]
+  img.save(fp=fp_out,format='GIF',append_images=frames,save_all=True,duration=100,loop=0)
