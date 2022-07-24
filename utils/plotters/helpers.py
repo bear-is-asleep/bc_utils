@@ -51,6 +51,7 @@ def make_plot_dir():
         os.system("mv -n Plots_" +day+"/ Plots/")
 
 def save_plot(fname,fig=None,ftype='.jpg',dpi=300,folder_name=f'Plots_{day}'):
+    #print(f'Plots/{folder_name}')
     os.system(f'mkdir -p Plots/{folder_name}')
     if fig == None:
       plt.savefig(f'{fname}{ftype}',bbox_inches = "tight",dpi=dpi)

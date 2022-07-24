@@ -163,28 +163,28 @@ def convert(list):
     res = int("".join(s))
       
     return(res)
-def sortstrings_numerically(strings,sort=True,drop_ints=True):
-  #Return tuple, matching string to int
-  ints = []
-  for s in strings:
-    ints.append([int(x) for x in s if x.isdigit()])
-  int_new = []
-  for l in ints:
-    int_new.append(convert(l))
-  tups = [[]]
-  for i in range(len(strings)):
-    tups.append([strings[i],int_new[i]])
-  #tups.pop(0)
-  tups = tups[1:]
-  if sort:
-    tups = sorted(tups,key=lambda x: x[1])
-  else:
-    tups = tups
-  if drop_ints:
-    for j in tups:
-      del j[1]
-    tups = flatten_list(tups)
-  return tups
+  def sortstrings_numerically(strings,sort=True,drop_ints=True):
+    #Return tuple, matching string to int
+    ints = []
+    for s in strings:
+      ints.append([int(x) for x in s if x.isdigit()])
+    int_new = []
+    for l in ints:
+      int_new.append(convert(l))
+    tups = [[]]
+    for i in range(len(strings)):
+      tups.append([strings[i],int_new[i]])
+    #tups.pop(0)
+    tups = tups[1:]
+    if sort:
+      tups = sorted(tups,key=lambda x: x[1])
+    else:
+      tups = tups
+    if drop_ints:
+      for j in tups:
+        del j[1]
+      tups = flatten_list(tups)
+    return tups
 
 def calc_prob_vis(cpa_ref):
   #Calculate the probability of a photon being vis given # of cpa_ref

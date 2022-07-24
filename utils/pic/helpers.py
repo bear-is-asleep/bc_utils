@@ -42,7 +42,6 @@ g4_keys = ['no_primaries',
 def gaussian(x,a, mean, stddev):
   #Ex: popt, pcov = optimize.curve_fit(gaussian, x, data)
   return a*np.exp(-((x - mean) / sqrt(2) / stddev)**2)
-
 def fit_gaussian(data):
   #Fits gaussian to 1d data and returns parameters
   steps=len(data)
@@ -162,3 +161,56 @@ def get_random_colors(n):
     color.append('#%06X' % randint(0, 0xFFFFFF))
   return color
 
+def sortstrings_numerically(strings,sort=True,drop_ints=True):
+  #Return tuple, matching string to int
+  ints = []
+  for s in strings:
+    ints.append([int(x) for x in s if x.isdigit()])
+  int_new = []
+  for l in ints:
+    int_new.append(convert(l))
+  tups = [[]]
+  for i in range(len(strings)):
+    tups.append([strings[i],int_new[i]])
+  #tups.pop(0)
+  tups = tups[1:]
+  if sort:
+    tups = sorted(tups,key=lambda x: x[1])
+  else:
+    tups = tups
+  if drop_ints:
+    for j in tups:
+      del j[1]
+    tups = flatten_list(tups)
+  return tups
+
+def flatten_list(_2d_list):
+    flat_list = []
+    # Iterate through the outer list
+    for element in _2d_list:
+        if type(element) is list:
+            # If the element is of type list, iterate through the sublist
+            for item in element:
+                flat_list.append(item)
+        else:
+            flat_list.append(element)
+    return flat_list
+
+def convert(list):
+      
+    # Converting integer list to string list
+    s = [str(i) for i in list]
+      
+    # Join list items using join()
+    res = int("".join(s))
+      
+    return(res)
+def discrete_gauss(n):
+    f = np.array([sps.comb(n - 1, i, exact=True) for i in range(n)], dtype='O')
+    f = np.float64(f)/np.float64(f).sum()
+
+    if not np.allclose(f.sum(), 1.0):
+        raise ValueError("The distribution sum is not close to 1.\n" 
+                         "f.sum(): %s" % f.sum())
+
+    return f
