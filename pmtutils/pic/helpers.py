@@ -769,482 +769,6 @@ def fake_bad_pmt(df,chs,reduce=0.0):
   new_err = err_calc(obs,pred)
   temp_df.loc[:,'pred_err'] = new_err
   return temp_df
-def pickle_to_root(fpname):
-  #Just type filename with or without path in front of it
-  zz = 0
-
-
-def make_analysis_df(pmts,muontracks,op_hits,columns,events,subruns,runs,cwd,
-fit_results=False,move_dfs=True):
-  #pmts: Locations and coating of pmts
-  #muontracks: Locations and #hits for muon tracks
-  #op_hits: # of hits and waveforms of pmts
-  #columns: Columns of output dataframe
-  #.
-  #.
-  #.
-  #fit_results: Fit results to op_obs information
-  #move_dfs: Move results into read_model folder (recommended for organization)
-
-  #Fit parameters
-  if fit_results:
-    #print('Set dumby fit values to initialize')
-    md0 = mh0 = b0 = md1 = mh1 = b1 = 0
-  else:
-    print('Loading fit parameters')
-    fit_df_loaded = pd.read_pickle(cwd+'fit_params.pkl') #This file should exist after one fit
-    fit_df0 = fit_df_loaded[fit_df_loaded.loc[:,'coating'] == 0]
-    fit_df1 = fit_df_loaded[fit_df_loaded.loc[:,'coating'] == 1]
-
-    #Coating = 0
-    md0 = fit_df0.loc[:,'coef_mean_distance'].values[0] #coefficient for linear fit to distance from track
-    mh0 = fit_df0.loc[:,'coef_mhits'].values[0] #coefficient for linear fit to track hits
-    b0  = fit_df0.loc[:,'intercept'].values[0] #z intercept for fit
-
-    #Coating = 1
-    md1 = fit_df1.loc[:,'coef_mean_distance'].values[0] #coefficient for linear fit to distance from track
-    mh1 = fit_df1.loc[:,'coef_mhits'].values[0] #coefficient for linear fit to track hits
-    b1  = fit_df1.loc[:,'intercept'].values[0] #z intercept for fit
-
-  pmt_info = np.zeros((pmts.shape[0],muontracks.shape[0],len(columns)))
-  j=0 #Counter for 2nd dim. (muon tracks)
-
-  op_hits_index = op_hits.index.drop_duplicates()
-  op_hits_index = op_hits_index.values
-
-  print('Starting analysis')
-  print_stars()
-
-  total_trks = 0 #Keep track of total number of cosmics processed
-  for run in runs: 
-    for subrun in subruns:
-      for event in events:
-        
-        start = time()
-        index = (run,subrun,event) #Index PMT_hits
-
-        #print(index in op_hits_index,index in muontracks.index.values,index,op_hits_index[-1],type(index))
-
-        #Check if event is in both muon and op information
-        in_op = False
-        in_muon = False
-        for tup in op_hits_index:
-          if tup == index:
-            in_op = True
-        for tup in muontracks.index.values:
-          if tup == index:
-            in_muon = True
-        if in_op and in_muon:# and subrun < 101 and run < 2: #temporary subspace to test
-          #print(f'Processing Run: {run} Subrun: {subrun} Event: {event}')
-          op_event_info = op_hits.loc[pd.IndexSlice[(index)]]
-          muon_temp = muontracks.loc[pd.IndexSlice[(index)]]
-        else:
-          #print(f'Skipped Run: {run} Subrun: {subrun} Event: {event}')
-          continue
-
-        #Divide hits to tracks based on length of tracks
-        for i_muon,row_muon in muon_temp.iterrows():
-          #Coordinates for muon tracks
-          x1 = row_muon['muontrk_x1']
-          y1 = row_muon['muontrk_y1']
-          z1 = row_muon['muontrk_z1']
-          x2 = row_muon['muontrk_x2']
-          y2 = row_muon['muontrk_y2']
-          z2 = row_muon['muontrk_z2']
-          length = sqrt((x2-x1)**2+(y2-y1)**2+(z2-z1)**2)
-          muon_temp.loc[i_muon,'muontrk_length'] = length
-        #Get fraction of hits belonging to each track
-        muon_temp.loc[:,'frac_hits'] = muon_temp.loc[:,'muontrk_length'].values/muon_temp.loc[:,'muontrk_length'].values.sum()
-        for i_muon,row_muon in muon_temp.iterrows():
-          total_trks+=1 #iterate counter
-          i=0 #Counter for second dim. 
-          for i_op,row_op in pmts.iterrows():
-            #Skip muon type of other (mtype = 5)
-            mtype = row_muon['muontrk_type']
-
-            #Coordinates for muon tracks
-            x1 = row_muon['muontrk_x1']
-            y1 = row_muon['muontrk_y1']
-            z1 = row_muon['muontrk_z1']
-            x2 = row_muon['muontrk_x2']
-            y2 = row_muon['muontrk_y2']
-            z2 = row_muon['muontrk_z2']
-
-            mtrks = row_muon['nmuontrks']
-            mhits = row_muon['nhits']*row_muon['frac_hits'] #Muon track hits, normalized to track length
-            tpc = row_muon['muontrk_tpc'] #Muon tpc
-            
-            #Coordinates for PMT
-            ch = row_op['ophit_opdet']
-            xp = row_op['ophit_opdet_x']
-            yp = row_op['ophit_opdet_y']
-            zp = row_op['ophit_opdet_z']
-            ch_hits = float(len(op_event_info[op_event_info['ophit_opdet'] == ch]))*row_muon['frac_hits'] #Account for double counting
-            
-            det_type = row_op['ophit_opdet_type']
-            d_s,x_h,y_h,z_h,dx = distances_to_PMT(mhits,x1,y1,z1,x2,y2,z2,xp,yp,zp) #Distance array to PMT from each hit
-            if det_type == 0: #Coated
-              N_pred = md0*np.mean(d_s)+mh0*mhits+b0 #Fit prediction
-            elif det_type == 1: #Uncoated
-              N_pred = md1*np.mean(d_s)+mh1*mhits+b1 #Fit prediction
-            
-
-            #Run model - old methods
-            #N_pred_arr = N_calc_lazy(d_s,efficiency,length,dEdx,l,det_type)
-            #N_pred_arr = N_calc(d_s,efficiency,dx,dEdx,l)
-            #N_pred = np.sum(N_pred_arr)
-            err = err_calc(ch_hits,N_pred)
-              
-
-            #Fill in arrays
-            pmt_info[i][j][1] = N_pred
-            pmt_info[i][j][0] = ch
-            pmt_info[i][j][2] = ch_hits
-            pmt_info[i][j][3] = err
-            pmt_info[i][j][4] = run
-            pmt_info[i][j][5] = subrun
-            pmt_info[i][j][6] = event
-            pmt_info[i][j][7] = pmts.loc[ch,'ophit_opdet_type']
-            pmt_info[i][j][8] = pmts.loc[ch,'distance']
-            pmt_info[i][j][9] = pmts.loc[ch,'ophit_opdet_x']
-            pmt_info[i][j][10] = pmts.loc[ch,'ophit_opdet_y']
-            pmt_info[i][j][11] = pmts.loc[ch,'ophit_opdet_z']
-            pmt_info[i][j][12] = pmts.loc[ch,'opdet_tpc']
-            pmt_info[i][j][13] = row_muon['muontrk_tpc']
-            pmt_info[i][j][14] = row_muon['muontrk_x1']
-            pmt_info[i][j][15] = row_muon['muontrk_y1']
-            pmt_info[i][j][16] = row_muon['muontrk_z1']
-            pmt_info[i][j][17] = row_muon['muontrk_x2']
-            pmt_info[i][j][18] = row_muon['muontrk_y2']
-            pmt_info[i][j][19] = row_muon['muontrk_z2']
-            pmt_info[i][j][20] = mhits
-            pmt_info[i][j][21] = mtype
-            pmt_info[i][j][22] = np.mean(d_s)
-            pmt_info[i][j][23] = dx
-            pmt_info[i][j][24] = row_muon['muontrk_length']
-            
-            i+=1 #Count up for PMTs
-          j+=1 #Count up for muon tracks
-        end = time()
-        elapsed = end-start
-        print(f'Run: {run} Subrun: {subrun} Event: {event} NTracks: {int(mtrks)} Time: {elapsed:.2f}s')
-  print_stars()
-  print(f'Ended analysis, Total tracks: {total_trks}')
-  #Resulting DF
-  pmt_info = pmt_info.reshape((pmts.shape[0]*muontracks.shape[0],len(columns)))
-  pmt_hits_df = pd.DataFrame(pmt_info,columns=columns)
-  pmt_hits_df = pmt_hits_df.set_index(['run','subrun','event'])
-  pmt_hits_df_trunc = truncate_df(pmt_hits_df,keys_to_sum={'ophit_pred','ophit_obs'})
-
-  #Remove extra zeros that may show up...
-  pmt_hits_df = pmt_hits_df[pmt_hits_df.loc[:,'ophit_ch'] != 0]
-  pmt_hits_df_trunc = pmt_hits_df_trunc[pmt_hits_df_trunc.loc[:,'ophit_ch'] != 0]
-
-  #Make muon tracks DF
-  mtrks = get_muon_tracks(pmt_hits_df)
-    
-  #Make fit params DF
-  if fit_results:
-    coefs,bs,scores,models = lin_fit_3d(pmt_hits_df)
-    coef_mhits0 = coefs[0][0] #coefficient for mhits for coated pmts
-    coef_mhits1 = coefs[1][0] #coefficient for mhits for uncoated pmts
-    coef_trkdistance0 = coefs[0][0] #coefficient for mean track distance for coated pmts
-    coef_trkdistance1 = coefs[1][0] #coefficient for mean track distance for uncoated pmts
-    b0 = bs[0] #z-intercept for coated pmts
-    b1 = bs[1] #z-intercept for uncoated pmts
-    score0 = scores[0] #score for coated pmts
-    score1 = scores[1] #score for uncoated pmts
-    data = [[coef_mhits0,coef_trkdistance0,b0,score0,0],
-            [coef_mhits1,coef_trkdistance1,b1,score1,1]] #coefs, intercepts, score, coating
-    fit_df = pd.DataFrame(data,columns=['coef_mhits','coef_mean_distance','intercept','score','coating'])
-    fit_df.to_pickle(cwd+'fit_params.pkl')
-    print_stars()
-    print('Finished fitting!')
-    if move_dfs:
-      os.system('mkdir -p read_model')
-      os.system(f'cp {cwd}fit_params.pkl {cwd}read_model')
-  else:
-    #Save DFs
-    mtrks.to_pickle(cwd+'muon_tracks.pkl')
-    pmt_hits_df.to_pickle(cwd+'pmt_hits_df.pkl')
-    pmt_hits_df_trunc.to_pickle(cwd+'pmt_hits_df_trunc.pkl')
-    print_stars()
-    print('Finished analyzing fit!')
-    #Move DFs
-    if move_dfs:
-      os.system('mkdir -p read_model')
-      os.system(f'mv {cwd}muon_tracks.pkl {cwd}pmt_hits_df* {cwd}read_model')
-
-def make_ref_df(pmts,muontracks,op_hits,events,subruns,runs,cwd,move_dfs=True):
-  #pmts: Locations and coating of pmts
-  #muontracks: Locations and #hits for muon tracks
-  #op_hits: # of hits and waveforms of pmts
-  #columns: Columns of output dataframe
-  #.
-  #.
-  #.
-  #move_dfs: Move results into read_model folder (recommended for organization)
-  #This function uses analytical calculations with reflections from PMT_info_ref.pkl
-
-  #Columns for pmt info
-  columns = ['ophit_ch','ophit_pred','ophit_obs','pred_err','run','subrun',
-          'event','ophit_opdet_type','ophit_opdet_x','ophit_opdet_y',
-          'ophit_opdet_z','opdet_tpc','muontrk_tpc','muontrk_x1', 'muontrk_y1', 'muontrk_z1', 'muontrk_x2',
-          'muontrk_y2', 'muontrk_z2','mhits','mtype','mean_distance','muontrk_dx','muontrk_length','ophit_pred_noatt',
-          'pred_err_noatt','ophit_pred_nodisp','pred_err_nodisp','Reflectivity','ophit_pred_noref','pred_err_noref',
-          'maxreflectivity','ophit_pred_consdisp','pred_err_consdisp','vis_prob','vuv_prob',
-          'efficiency','ophit_pred_nodisp_noatt','pred_err_nodisp_noatt','ophit_pred_nodisp_noref',
-          'pred_err_nodisp_noref']
-  #prediction keys
-  predkeys = [key for key in columns if 'ophit_pred' in key]
-  #err keys
-  errkeys = [key for key in columns if 'pred_err' in key]
-  #Keys to sum over for total dataframe (namely hit counts)
-  keys_to_sum = predkeys.copy()
-  keys_to_sum.append('ophit_obs')
-
-  pmt_info = np.zeros((pmts.shape[0],muontracks.shape[0],len(columns)))
-  j=0 #Counter for 2nd dim. (muon tracks)
-
-  op_hits_index = op_hits.index.drop_duplicates()
-  op_hits_index = op_hits_index.values
-
-  print('Starting analysis')
-  print_stars()
-
-  total_trks = 0 #Keep track of total number of cosmics processed
-  for run in runs: 
-    for subrun in subruns:
-      for event in events:
-        
-        start = time()
-        index = (run,subrun,event) #Index PMT_hits
-
-        #print(index in op_hits_index,index in muontracks.index.values,index,op_hits_index[-1],type(index))
-
-        #Check if event is in both muon and op information
-        in_op = False
-        in_muon = False
-        for tup in op_hits_index:
-          if tup == index:
-            in_op = True
-        for tup in muontracks.index.values:
-          if tup == index:
-            in_muon = True
-        if in_op and in_muon and event < 300: #temporary subspace to test
-          print(f'Processing Run: {run} Subrun: {subrun} Event: {event}')
-          op_event_info = op_hits.loc[pd.IndexSlice[(index)]]
-          muon_temp = muontracks.loc[pd.IndexSlice[(index)]]
-        else:
-          #print(f'Skipped Run: {run} Subrun: {subrun} Event: {event}')
-          continue
-
-        #Divide hits to tracks based on length of tracks
-        for i_muon,row_muon in muon_temp.iterrows():
-          #Coordinates for muon tracks
-          x1 = row_muon['muontrk_x1']
-          y1 = row_muon['muontrk_y1']
-          z1 = row_muon['muontrk_z1']
-          x2 = row_muon['muontrk_x2']
-          y2 = row_muon['muontrk_y2']
-          z2 = row_muon['muontrk_z2']
-          length = sqrt((x2-x1)**2+(y2-y1)**2+(z2-z1)**2)
-          muon_temp.loc[i_muon,'muontrk_length'] = length
-        #Get fraction of hits belonging to each track
-        muon_temp.loc[:,'frac_hits'] = muon_temp.loc[:,'muontrk_length'].values/muon_temp.loc[:,'muontrk_length'].values.sum()
-        for i_muon,row_muon in muon_temp.iterrows():
-          total_trks+=1 #iterate counter
-          i=0 #Counter for second dim.
-          for i_op,row_op in pmts.iterrows():
-            #Quick check for reflectivity
-            reflectivity = row_op['Reflectivity']
-            max_reflectivity = row_op['maxreflectivity'] 
-            ch = row_op['ophit_opdet']
-            if reflectivity == 0 and ch%1000 != row_op['ophit_opdet']:
-              continue #skip events with no possible photons, but keep ones with location info
-            mtype = row_muon['muontrk_type']
-
-            #Coordinates for muon tracks
-            x1 = row_muon['muontrk_x1']
-            y1 = row_muon['muontrk_y1']
-            z1 = row_muon['muontrk_z1']
-            x2 = row_muon['muontrk_x2']
-            y2 = row_muon['muontrk_y2']
-            z2 = row_muon['muontrk_z2']
-
-            mtrks = row_muon['nmuontrks']
-            mhits = row_muon['nhits']*row_muon['frac_hits'] #Muon track hits, normalized to track length
-            tpc = row_muon['muontrk_tpc'] #Muon tpc
-            
-            #Coordinates for PMT
-            xp = row_op['ophit_opdet_x']
-            yp = row_op['ophit_opdet_y']
-            zp = row_op['ophit_opdet_z']
-            tpcp = row_op['opdet_tpc'] #tpc for pmt
-            vis_prob = row_op['vis_prob'] #Probability of photon being visible
-            vuv_prob = row_op['vuv_prob'] #Probability of photon being vuv
-
-            ch_hits = 0
-            if ch%1000 == row_op['ophit_opdet']: #Avoid double counting
-              ch_hits = float(len(op_event_info[op_event_info['ophit_opdet'] == ch]))*row_muon['frac_hits'] #Account for double counting
-
-            det_type = row_op['ophit_opdet_type']
-            d_s,x_h,y_h,z_h,dx = distances_to_PMT(mhits,x1,y1,z1,x2,y2,z2,xp,yp,zp) #Distance array to PMT from each hit
-            if det_type == 0: #Coated
-              efficiency = (vuv_prob*e_ws+vis_prob*(1-e_ws))*QE*reflectivity
-            elif det_type == 1: #Uncoated
-              efficiency = vis_prob*QE*reflectivity
-            
-
-            #Run model - old methods
-            #N_calc(x,efficiency,length,dEdx,l,photon_interactions=True,dispersion=True)
-            #N_pred_arr = N_calc_lazy(d_s,efficiency,length,dEdx,l,det_type)
-            
-            
-            if tpc == tpcp: #muon and PMT in same TPC chamber
-              #Everything
-              N_pred_arr = N_calc(d_s,efficiency,dx,dEdx,l)
-              N_pred = np.sum(N_pred_arr)
-              err = err_calc(ch_hits,N_pred)
-                
-              #No attenuation
-              N_pred_arr_noatt = N_calc(d_s,efficiency,dx,dEdx,l,photon_interactions=False)
-              N_pred_noatt = np.sum(N_pred_arr_noatt)
-              err_noatt = err_calc(ch_hits,N_pred_noatt)
-
-              #No dispersion
-              N_pred_arr_nodisp = N_calc(d_s,efficiency,dx,dEdx,l,dispersion=False)
-              N_pred_nodisp = np.sum(N_pred_arr_nodisp)
-              err_nodisp = err_calc(ch_hits,N_pred_nodisp)
-
-              #No attenuation or dispersion
-              N_pred_arr_nodisp_noatt = N_calc(d_s,efficiency,dx,dEdx,l,dispersion=False,photon_interactions=False)
-              N_pred_nodisp_noatt = np.sum(N_pred_arr_nodisp_noatt)
-              err_nodisp_noatt = err_calc(ch_hits,N_pred_nodisp_noatt)
-              
-
-              #No reflections
-              if reflectivity == max_reflectivity: #Only keep channel with max reflectivity (1 for no ref.)
-                N_pred_arr_noref = N_calc(d_s,efficiency,dx,dEdx,l)
-                N_pred_noref = np.sum(N_pred_arr_noref)
-                err_noref = err_calc(ch_hits,N_pred_noref)
-
-                #No reflection or dispersion
-                N_pred_arr_nodisp_noref = N_calc(d_s,efficiency,dx,dEdx,l,dispersion=False)
-                N_pred_nodisp_noref = np.sum(N_pred_arr_nodisp_noref)
-                err_nodisp_noref = err_calc(ch_hits,N_pred_nodisp_noref)
-              
-              #Constant dispersion (equal to A_pmt/A_det)
-              N_pred_arr_consdisp = N_calc_lazy(d_s,efficiency,dx,dEdx,l)
-              N_pred_consdisp = np.sum(N_pred_arr_consdisp)
-              err_consdisp = err_calc(ch_hits,N_pred_consdisp)
-            else: #Not in the same TPC
-              N_pred = 0.
-              N_pred_arr_noatt = 0.
-              N_pred_nodisp = 0.
-              N_pred_nodisp_noatt = 0.
-              N_pred_nodisp_noref = 0.
-              N_pred_noref = 0.
-              N_pred_consdisp = 0.
-              err = err_calc(ch_hits,N_pred)
-              err_noatt = err_calc(ch_hits,N_pred_noatt)
-              err_nodisp = err_calc(ch_hits,N_pred_nodisp)
-              err_noref = err_calc(ch_hits,N_pred_noref)
-              err_consdisp = err_calc(ch_hits,N_pred_consdisp)
-              err_nodisp_noatt = err_calc(ch_hits,N_pred_nodisp_noatt)
-              err_nodisp_noref = err_calc(ch_hits,N_pred_nodisp_noref)
-
-            #True det locations
-            xt = row_op['true_x']
-            yt = row_op['true_y']
-            zt = row_op['true_z']
-
-
-            #Fill in arrays
-            pmt_info[i][j][1] = N_pred
-            pmt_info[i][j][0] = ch
-            pmt_info[i][j][2] = ch_hits
-            pmt_info[i][j][3] = err
-            pmt_info[i][j][4] = run
-            pmt_info[i][j][5] = subrun
-            pmt_info[i][j][6] = event
-            pmt_info[i][j][7] = det_type
-            pmt_info[i][j][8] = xt
-            pmt_info[i][j][9] = yt
-            pmt_info[i][j][10] = zt
-            pmt_info[i][j][11] = tpcp
-            pmt_info[i][j][12] = row_muon['muontrk_tpc']
-            pmt_info[i][j][13] = row_muon['muontrk_x1']
-            pmt_info[i][j][14] = row_muon['muontrk_y1']
-            pmt_info[i][j][15] = row_muon['muontrk_z1']
-            pmt_info[i][j][16] = row_muon['muontrk_x2']
-            pmt_info[i][j][17] = row_muon['muontrk_y2']
-            pmt_info[i][j][18] = row_muon['muontrk_z2']
-            pmt_info[i][j][19] = mhits
-            pmt_info[i][j][20] = mtype
-            pmt_info[i][j][21] = np.mean(d_s)
-            pmt_info[i][j][22] = dx
-            pmt_info[i][j][23] = row_muon['muontrk_length']
-            pmt_info[i][j][24] = N_pred_noatt
-            pmt_info[i][j][25] = err_noatt
-            pmt_info[i][j][26] = N_pred_nodisp
-            pmt_info[i][j][27] = err_nodisp
-            pmt_info[i][j][28] = reflectivity
-            pmt_info[i][j][29] = N_pred_noref
-            pmt_info[i][j][30] = err_noref
-            pmt_info[i][j][31] = max_reflectivity
-            pmt_info[i][j][32] = N_pred_consdisp
-            pmt_info[i][j][33] = err_consdisp
-            pmt_info[i][j][34] = vis_prob
-            pmt_info[i][j][35] = vuv_prob
-            pmt_info[i][j][36] = efficiency
-            pmt_info[i][j][37] = N_pred_nodisp_noatt
-            pmt_info[i][j][38] = err_nodisp_noatt
-            pmt_info[i][j][39] = N_pred_nodisp_noref
-            pmt_info[i][j][40] = err_nodisp_noref
-
-            #Variables that could cause bugs
-            #_disp = d_calc(d_s)
-            #_att = d_calc(d_s)
-
-            i+=1 #Count up for PMTs
-          j+=1 #Count up for muon tracks
-        end = time()
-        elapsed = end-start
-        print(f'Run: {run} Subrun: {subrun} Event: {event} NTracks: {int(mtrks)} Time: {elapsed:.2f}s')
-  print_stars()
-  print(f'Ended analysis, Total tracks: {total_trks}')
-  #Resulting DF
-  pmt_info = pmt_info.reshape((pmts.shape[0]*muontracks.shape[0],len(columns)))
-  pmt_hits_df = pd.DataFrame(pmt_info,columns=columns)
-  pmt_hits_df = pmt_hits_df.set_index(['run','subrun','event'])
-
-  #Recalculate errors using summed prediction and obs. values
-  pmt_hits_df_trunc = truncate_df(pmt_hits_df,predkeys,errkeys,
-  keys_to_sum=keys_to_sum,mod_chs=True) #mod channels
-
-  #Remove extra zeros that may show up...
-  pmt_hits_df = pmt_hits_df[pmt_hits_df.loc[:,'ophit_ch'] != 0]
-  pmt_hits_df_trunc = pmt_hits_df_trunc[pmt_hits_df_trunc.loc[:,'ophit_ch'] != 0]
-
-  #Sort DFs
-  pmt_hits_df = pmt_hits_df.reindex(sorted(pmt_hits_df.columns), axis=1)
-  pmt_hits_df_trunc = pmt_hits_df_trunc.reindex(sorted(pmt_hits_df_trunc.columns), axis=1)
-
-  #Make muon tracks DF
-  mtrks = get_muon_tracks(pmt_hits_df)
-  
-
-  #Save DFs
-  mtrks.to_pickle(cwd+'muon_tracks.pkl')
-  pmt_hits_df.to_pickle(cwd+'pmt_hits_df.pkl')
-  pmt_hits_df_trunc.to_pickle(cwd+'pmt_hits_df_trunc.pkl')
-  print_stars()
-  print('Finished analyzing fit!')
-  #Move DFs
-  if move_dfs:
-    os.system('mkdir -p read_model')
-    os.system(f'mv {cwd}muon_tracks.pkl {cwd}pmt_hits_df* {cwd}read_model')
 
 def get_peakT(op_df,pmts,tpc,index,bw,number_pmts=10,thresholdPE=1,convert_to_edge=False):
   #Must be an op_df
@@ -1366,7 +890,7 @@ def get_treadout(df,return_key='treadout',x_key='detx',t_key='StartT'): #Need to
   df.loc[:,return_key] = t + x/v_drift
   return df
 
-def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=-1,xmin=None,xmax=None):
+def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=-1,xmin=None,xmax=None,arapucas=True):
   #Make kde histogram using dataframe and its key
   #df is input dataframe
   #xkey is x axis key to make bin sizes
@@ -1374,8 +898,8 @@ def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=-1,xmin=None,xmax=None):
   #index is which event we want
   #bw is bin wdith
   #pmt specifies which pmt we're looking at: 
-  #0 is coated, 
-  #1 is uncoated, 
+  #0 is coated, (remove support for this with inclusion of x-arapucas)
+  #1 is uncoated, (remove support for this with inclusion of x-arapucas)
   #-1 is all of them, 
   #otherwise its the channel (need to include x-arapucas soon)
   xs = df.loc[index,xkey].sort_index().values
@@ -1387,33 +911,36 @@ def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=-1,xmin=None,xmax=None):
     binedges = np.arange(xs.min(),xs.max()+bw,bw)
     trim_edges = False
   else:
-    binedges = np.arange(xmin,xmax+bw,bw)
+    binedges = np.arange(xmin,xmax+2*bw,bw)
     trim_edges = True #Digitize keeps excess data in extra bins, first and last ones. We should drop these since they're out of the region of interest
 
-  print(binedges.shape)
-
   check_all = False #Check all pmts will be using if pmt=2
-  check_ch = False #Check only a single chanel
+  check_ch = True #Check only a single chanel
   if tpc == 2: 
     check_tpc = False
     title_tpc = ''
   else: 
     check_tpc = True
     title_tpc = f' TPC{tpc}'
-  if pmt == 0 or pmt == 1: #Use this to 
-    check_coating = True
-    if pmt == 0:
-      title_pmt = ' Coated PMTs '
-    if pmt == 1:
-      title_pmt = ' Uncoated PMTs '
-  else:
-    check_coating = False
-    if pmt == 2:
-      check_all = True
-      title_pmt = ''
+  if not arapucas: #not checking arapucas
+    if pmt == 0 or pmt == 1: #Use this to 
+      check_coating = True
+      if pmt == 0:
+        title_pmt = ' Coated PMTs '
+      if pmt == 1:
+        title_pmt = ' Uncoated PMTs '
     else:
-      check_ch = True
-      title_pmt = f' PMT{pmt} '
+      check_coating = False
+      if pmt == 2:
+        check_all = True
+        title_pmt = ''
+      else:
+        check_ch = True
+        title_pmt = f' PMT{pmt} '
+  else:
+    check_ch = True #This will be the main option in pad, I'll fix this later if needed
+    check_coating = False
+    title_pmt = f' PMT{pmt} '
   #Make title for plots
   #title = f'PE vs. timing{title_pmt}{title_tpc}\nRun {index[0]}, Subrun {index[1]}, Event {index[2]}'
   title = f'PE vs. timing{title_pmt}{title_tpc}'
@@ -1429,13 +956,14 @@ def get_xy_bins(df,xkey,ykey,index,bw,tpc=2,pmt=-1,xmin=None,xmax=None):
       y_hist[ind] += ys[i] #Add y-val which belongs to this pmt
   #bincenters = binedges - bw/2 #temp fix of x-axis not being centered
   bincenters = binedges #temp fix of x-axis not being centered
+  #print(y_hist,bincenters)
   if trim_edges:
     #Delete first and last elements
     bincenters = np.delete(bincenters,0)
     bincenters = np.delete(bincenters,-1)
     y_hist = np.delete(y_hist,0)
     y_hist = np.delete(y_hist,-1)
-    tze=32
   return bincenters,y_hist,title
+
 
 

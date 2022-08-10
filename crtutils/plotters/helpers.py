@@ -19,7 +19,7 @@ from bc_utils.utils import pic,plotters
 xls = 16 #axis size
 tls = 20 #title size
 lls = 16 #legend size
-tbs=10 #Text box size
+tbs=14 #Text box size
 #Small displacement for text
 small = 5
 matplotlib.rcParams['xtick.labelsize'] = 13
@@ -79,30 +79,17 @@ def max_bin_height(ax,bins):
       max_bin = bar.get_height()
   return max_bin
 
-def make_lines(mark_borders=False,ax=None):
-  if ax is None:
-    plt.axhline(y=62.5,linestyle='--',linewidth=3)
-    plt.axhline(y=-62.5,linestyle='--',linewidth=3)
-    plt.axvline(x=125,linestyle='--',linewidth=3)
-    plt.axvline(x=250,linestyle='--',linewidth=3)
-    plt.axvline(x=375,linestyle='--',linewidth=3)
-    if mark_borders:
-      plt.axvline(x=500,linestyle='--',linewidth=3)
-      plt.axvline(x=0,linestyle='--',linewidth=3)
-      plt.axhline(y=200,linestyle='--',linewidth=3)
-      plt.axhline(y=-200,linestyle='--',linewidth=3)
-  else:
-    ax.axhline(y=62.5,linestyle='--',linewidth=3)
-    ax.axhline(y=-62.5,linestyle='--',linewidth=3)
-    ax.axvline(x=125,linestyle='--',linewidth=3)
-    ax.axvline(x=250,linestyle='--',linewidth=3)
-    ax.axvline(x=375,linestyle='--',linewidth=3)
-    if mark_borders:
-      ax.axvline(x=500,linestyle='--',linewidth=3)
-      ax.axvline(x=0,linestyle='--',linewidth=3)
-      ax.axhline(y=200,linestyle='--',linewidth=3)
-      ax.axhline(y=-200,linestyle='--',linewidth=3)
-
+def make_lines(mark_borders=False):
+  plt.axhline(y=62.5,linestyle='--',linewidth=3)
+  plt.axhline(y=-62.5,linestyle='--',linewidth=3)
+  plt.axvline(x=125,linestyle='--',linewidth=3)
+  plt.axvline(x=250,linestyle='--',linewidth=3)
+  plt.axvline(x=375,linestyle='--',linewidth=3)
+  if mark_borders:
+    plt.axvline(x=500,linestyle='--',linewidth=3)
+    plt.axvline(x=0,linestyle='--',linewidth=3)
+    plt.axhline(y=200,linestyle='--',linewidth=3)
+    plt.axhline(y=-200,linestyle='--',linewidth=3)
 
 
 def kde_1dhist(df,titles,xlabels,ylabels,keys,show,save,save_name,fit_gaus,trim_outliers):
@@ -591,8 +578,7 @@ def make_bar_scatter_plot(bincenters,yvals,bw,title='',left=-1,right=8,truncate=
 
 def interactive_TPC(tpc,label,label_title,df,coating=-1,cmap='viridis',return_plot=False,
             normalize=False,facecolor='cyan',ax=None,fig=None,sc=None,label_PMTs=True,vmax=None,small=6,
-            text_label=None,tbs=tbs,tls=tls,xls=xls,textcolor='black',markboxes=True,labelcolor='black',
-            figcolor='white'):
+            text_label=None,tbs=tbs,tls=tls,xls=xls):
   #If coating is -1, plot all
   #coating 0 for coated
   # coating 1 for uncoated
@@ -606,10 +592,8 @@ def interactive_TPC(tpc,label,label_title,df,coating=-1,cmap='viridis',return_pl
   if fig is None and ax is None:
     #plt.subplots_adjust(left=0.25, bottom=0.25)
     fig = plt.figure(figsize=(16,10))
-    ax = fig.add_axes([0.075,0.1,0.7,0.7])
-    if markboxes:
-      make_lines()
-    fig.patch.set_facecolor(figcolor)
+    ax = fig.add_subplot()
+    make_lines()
   #if sc is not None:
   #  sc.remove()
   #fig = plt.figure(figsize=(10,8))
@@ -654,14 +638,14 @@ def interactive_TPC(tpc,label,label_title,df,coating=-1,cmap='viridis',return_pl
         
       if z > 250 and skip and label_PMTs:
         if det_ch == 166 or det_ch == 160:
-          ax.text(z-2*small,y-2*small,det_label,fontsize=tbs,color=textcolor)
+          ax.text(z-2*small,y-2*small,det_label,fontsize=tbs)
         else:
-          ax.text(z-2*small,y+small,det_label,fontsize=tbs,color=textcolor)
+          ax.text(z-2*small,y+small,det_label,fontsize=tbs)
       if z < 250 and skip and label_PMTs:
         if det_ch == 150 or det_ch == 156:
-          ax.text(z+0.15*small,y-2*small,det_label,fontsize=tbs,color=textcolor)
+          ax.text(z+0.15*small,y-2*small,det_label,fontsize=tbs)
         else:
-          ax.text(z+0.15*small,y+small,det_label,fontsize=tbs,color=textcolor)
+          ax.text(z+0.15*small,y+small,det_label,fontsize=tbs)
     
     if tpc == 1 and x > 0:
       #Apply coating cut
@@ -678,37 +662,36 @@ def interactive_TPC(tpc,label,label_title,df,coating=-1,cmap='viridis',return_pl
           skip = True #Keeps good PMTs
       if z > 250 and skip and label_PMTs: 
         if det_ch == 166 or det_ch == 160:
-          ax.text(z-2*small,y-2*small,det_label,fontsize=tbs,color=textcolor)
+          ax.text(z-2*small,y-2*small,det_label,fontsize=tbs)
         else:
-          ax.text(z-2*small,y+small,det_label,fontsize=tbs,color=textcolor)
+          ax.text(z-2*small,y+small,det_label,fontsize=tbs)
       if z < 250 and skip and label_PMTs:
         if det_ch == 150 or det_ch == 156:
-          ax.text(z+0.15*small,y-2*small,det_label,fontsize=tbs,color=textcolor)
+          ax.text(z+0.15*small,y-2*small,det_label,fontsize=tbs)
         else:
-          ax.text(z+0.15*small,y+small,det_label,fontsize=tbs,color=textcolor)
+          ax.text(z+0.15*small,y+small,det_label,fontsize=tbs)
     if skip:
-      if det_type <= 1:
+      if det_type > 1:
         shapes.append('o')
-        sizes.append(150)
+        sizes.append(80)
       else:
         shapes.append('s')
-        sizes.append(125)
+        sizes.append(40)
 
   data_points = np.asarray(data_points)
   if normalize:
     if data_points[:,3].sum() != 0: #Don't divide if the sume is zero!
       data_points[:,3] = data_points[:,3]/data_points[:,3].sum()
-  sc = plotters.mscatter(x=data_points[:,2],y=data_points[:,1],c=data_points[:,3],s=sizes,m=shapes,
-    ax=ax,cmap=cmap,alpha=0.7,vmax=vmax,edgecolor=textcolor)
+  sc = plotters.mscatter(x=data_points[:,2],y=data_points[:,1],c=data_points[:,3],s=sizes,m=shapes,ax=ax,cmap=cmap,alpha=0.7,vmax=vmax)
   plt.subplots_adjust(left=0.25)
   ax.margins(x=0.05)
   divider = make_axes_locatable(ax)
   cax = divider.append_axes("right", size="5%", pad=0.05)
-  fig.colorbar(sc,cax=cax,ax=ax)
+  cbar = fig.colorbar(sc,cax=cax,ax=ax)
   #cbar.set_label(f'{label_title}',rotation=270,fontsize=xls)
-  ax.set_xlabel('Z [cm]',fontsize=xls,color=labelcolor)
-  ax.set_ylabel('Y [cm]',fontsize=xls,color=labelcolor)
-  ax.set_title(f'{label_title} TPC{tpc}',fontsize = tls,color=labelcolor)
+  ax.set_xlabel('Z [cm]',fontsize=xls)
+  ax.set_ylabel('Y [cm]',fontsize=xls)
+  ax.set_title(f'{label_title} TPC{tpc}',fontsize = tls)
   ax.set_xlim([0,500])
   ax.set_ylim([-200,200])
   
@@ -718,8 +701,7 @@ def interactive_TPC(tpc,label,label_title,df,coating=-1,cmap='viridis',return_pl
     return fig,ax
 
 def plot_g4_muon(g4,muon,index,thigh,tlow,small=20,x='z',y='y',save_fig=False,display_run_info=True,n=50,
-  show_vtx=True,remove_other=False,fig=None,ax=None,muon_type=False,show_legend=False,checktpc=False,tpc=0,
-  plotg4=True,plotmuon=True,mlinewidth=10):
+  show_vtx=True,remove_other=False,fig=None,ax=None,muon_type=False,show_legend=False):
   #g4 and muon are the dataframes for this info
   #index is (run,subrun,event)
   #thigh and tlow are treadout maximum and maximum (see get_treadout in pmtutils)
@@ -765,43 +747,44 @@ def plot_g4_muon(g4,muon,index,thigh,tlow,small=20,x='z',y='y',save_fig=False,di
       gxs.append([row[f'StartPoint{x}'],row[f'EndPoint{x}']])
       gys.append([row[f'StartPoint{y}'],row[f'EndPoint{y}']])
   gxs.pop(0); gys.pop(0) #Delete extra
+
   #Populate muons
   mxs = [[]]
   mys = [[]]
   if isinstance(mtemp,pd.core.series.Series): #theres only one track
     m_iloc = False
-    if checktpc and tpc == mtemp['muontrk_tpc']:
-      mxs.append([mtemp[f'muontrk_{x}1'],mtemp[f'muontrk_{x}2']])
-      mys.append([mtemp[f'muontrk_{y}1'],mtemp[f'muontrk_{y}2']])
+    mxs.append([mtemp[f'muontrk_{x}1'],mtemp[f'muontrk_{x}2']])
+    mys.append([mtemp[f'muontrk_{y}1'],mtemp[f'muontrk_{y}2']])
   else:
     m_iloc=True
     for _,row in mtemp.iterrows(): #iterate through all tracks
-      if checktpc and tpc == row['muontrk_tpc']:
-        mxs.append([row[f'muontrk_{x}1'],row[f'muontrk_{x}2']])
-        mys.append([row[f'muontrk_{y}1'],row[f'muontrk_{y}2']])
+      mxs.append([row[f'muontrk_{x}1'],row[f'muontrk_{x}2']])
+      mys.append([row[f'muontrk_{y}1'],row[f'muontrk_{y}2']])
   mxs.pop(0); mys.pop(0)
   for i in range(len(mxs)):#iterate through all tracks, labeling one
-    if i ==0 and plotmuon:
-      ax.plot(mxs[i],mys[i],linewidth=mlinewidth,alpha=0.5,label='Muon Tracks')
-    elif plotmuon:
-      ax.plot(mxs[i],mys[i],linewidth=mlinewidth,alpha=0.5)
+    if i ==0:
+      ax.plot(mxs[i],mys[i],linewidth=5,alpha=0.5,label='Muon Tracks')
+    else:
+      if i < 20: #temporary check
+        ax.plot(mxs[i],mys[i],linewidth=5,alpha=0.5)
+      qz=0
     if m_iloc and muon_type:
       ax.text(mxs[i][0],mys[i][0],f'{mtemp.iloc[i]["muontrk_type"]:.0f}',fontsize=14) #track type label
     elif muon_type:
       ax.text(mxs[i][0],mys[i][0],f'{mtemp["muontrk_type"]:.0f}',fontsize=14) #track type label
   for i in range(len(gxs)): #iterate through all g4 tracks, lableing one
-    if i  == 0 and plotg4:
-      ax.plot(gxs[i],gys[i],ls='--',label='G4 Tracks',linewidth=5,alpha=0.5,c='darkcyan')
-    elif plotg4:
-      ax.plot(gxs[i],gys[i],ls='--',linewidth=5,alpha=0.5,c='darkcyan')
+    if i  == 0:
+      ax.plot(gxs[i],gys[i],ls='--',c=color[i],label='G4 Tracks')
+    else:
+      ax.plot(gxs[i],gys[i],ls='--',c=color[i])
     if show_vtx:
       if use_iloc:
-        ax.scatter(gtemp.iloc[i][f'det{x}'],gtemp.iloc[i][f'det{y}'],s=100,marker='s',c='darkcyan',alpha=0.5)
+        ax.scatter(gtemp.iloc[i][f'det{x}'],gtemp.iloc[i][f'det{y}'],s=100,marker='s',c=color[i])
       else:
-        ax.scatter(gtemp[f'det{x}'],gtemp[f'det{y}'],s=100,marker='s',c='darkcyan')
+        ax.scatter(gtemp[f'det{x}'],gtemp[f'det{y}'],s=100,marker='s',c=color[i])
     
   if show_legend:
-    ax.legend(fontsize=16,bbox_to_anchor=(1.1,1.13))
+    ax.legend(fontsize=14)
   if set_labels:
     ax.set_xlabel(f'{x} [cm]',fontsize=xls)
     ax.set_ylabel(f'{y} [cm]',fontsize=xls)
@@ -823,7 +806,6 @@ def plot_g4_muon(g4,muon,index,thigh,tlow,small=20,x='z',y='y',save_fig=False,di
   if save_fig:
     plotters.save_plot(f'g4_muontrks_{y}{x}_event{run:.0f}{subrun:.0f}{event:.0f}')
     plt.close()
-  return fig,ax
   #print(mxs,mys)
 
 
