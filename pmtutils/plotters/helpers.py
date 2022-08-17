@@ -695,6 +695,7 @@ def interactive_TPC(tpc,label,label_title,df,coating=-1,cmap='viridis',return_pl
         sizes.append(125)
 
   data_points = np.asarray(data_points)
+  #print(data_points)
   if normalize:
     if data_points[:,3].sum() != 0: #Don't divide if the sume is zero!
       data_points[:,3] = data_points[:,3]/data_points[:,3].sum()
@@ -825,6 +826,29 @@ def plot_g4_muon(g4,muon,index,thigh,tlow,small=20,x='z',y='y',save_fig=False,di
     plt.close()
   return fig,ax
   #print(mxs,mys)
+
+def plot_tracks(df,startx_key,starty_key,endx_key,endy_key,ax,**plotkwargs):
+  #Plot dataframe tracks with just start and end point keys
+  #ax is axis to plot on
+  #plotkwargs is list of args to pass to plot
+
+  if isinstance(df,pd.core.series.Series): #Get single values
+    x1 = df.loc[startx_key]
+    x2 = df.loc[endx_key]
+    y1 = df.loc[starty_key]
+    y2 = df.loc[endy_key]
+    line, = ax.plot([x1,x2],[y1,y2],**plotkwargs)
+
+    
+  else: #Get numpy arrays
+    x1 = df.loc[:,startx_key].values
+    x2 = df.loc[:,endx_key].values
+    y1 = df.loc[:,starty_key].values
+    y2 = df.loc[:,endy_key].values
+    line, = ax.plot([x1[0],x2[0]],[y1[0],y2[0]],**plotkwargs)
+    for i in range(1,len(x1)):
+      ax.plot([x1[i],x2[i]],[y1[i],y2[i]],**plotkwargs)
+  return line #These will be used to make the legend
 
 
 
