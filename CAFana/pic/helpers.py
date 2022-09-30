@@ -60,10 +60,11 @@ def get_df_dropindeces(df,drop_indeces):
   """Since not all dfs have all indeces, we will use this to drop events from pot normalization
   Only drops events that are already in dataframe. Without this method we'd reach an out of bounds error"""
   indeces = df.index.drop_duplicates() #Get event list
+  drop = [] #Make array to drop indeces
   for ind in drop_indeces:
     if ind in indeces:
-      df = df.drop(ind)
-  return df
+      drop.append(ind)
+  return df.drop(drop)
 
 def get_df_keepindeces(df,keep_indeces):
   """Since not all dfs have all indeces, we will use this to keep events from pot normalization
@@ -158,8 +159,9 @@ def get_df(tree,keys):
   """Input tree from uproot and keys, return df with indeces
   If dfs are different sizes, we'll return a list of dfs
   """
-  keys.extend(hdrkeys)
-  df = tree.arrays(keys,library='pd')
+  copy_keys = keys.copy() #Avoid modifying input
+  copy_keys.extend(hdrkeys)
+  df = tree.arrays(copy_keys,library='pd')
   if isinstance(df,tuple): #If it's a tuple, we'll rename each df, and return the list of them
     dfs = []
     for tempdf in df:
@@ -172,7 +174,7 @@ def get_df(tree,keys):
     df = df.set_index(hdrkeys)
     df = df.sort_index()
     return df
-
+    
 def cut_pdg_event(df,pdg,pdg_key=f'{primprefix}pdg',status_key=f'{primprefix}gstatus',T_key=f'{primprefix}genT',E_threshold=0,exclude=True,
                 max_count=1):
   
@@ -308,20 +310,51 @@ def find_index_with_key(dfs,key):
   """Find df which contains key specified, returns indeces of df list
   It should only return one index"""
   indeces = []
-  for i,df in enumerate(dfs):
-    keys = df.keys()
-    if key in keys:
-      #return i
-      indeces.append(i)
-  #print(indeces)
-  if len(indeces) == 1:
-    return indeces[0]
+  if isinstance(dfs,list):
+    for i,df in enumerate(dfs):
+      keys = df.keys()
+      if key in keys:
+        #return i
+        indeces.append(i)
+    #print(indeces)
+    if len(indeces) == 1:
+      return indeces[0]
+    else:
+      Warning('This key shows up in multiple dataframes.')
+    return indeces
   else:
-    Warning('This key shows up in multiple dataframes.')
-  return indeces
+    return None #This means there's only one dataframe, and we don't need to index a list
 
+def FV_cut(df,x_key=f'{mcnuprefix}position.x',y_key=f'{mcnuprefix}position.y',z_key=f'{mcnuprefix}position.z',
+  xmax=175,xmin=1.5,ymax=175,zmin=20,zmax=470):
+  """Make truth level fidicual cut, we won't see these events"""
+  keep_indeces = []
+  indeces = df.index.drop_duplicates()
+  for ind in indeces:
+    #Get genie vertex coords.
+    x = df.loc[ind,x_key]
+    y = df.loc[ind,y_key]
+    z = df.loc[ind,z_key]
 
+    if abs(x) > xmin and abs(x) < xmax and abs(y) < ymax and abs(z) > zmin and abs(z) < zmax:
+      keep_indeces.append(ind)
+  return keep_indeces #Multiindex to index df
 
+def cut_recoE(df,E_key=f'{shwprefix}bestplane_energy',cutoff=0.2,npass=1):
+  """Cut events using reco energy > cutoff
+  npass: number of reco events that must have greater than this energy
+  """
+  keep_indeces = []
+  indeces = df.index.drop_duplicates()
+  for ind in indeces:
+    Es = df.loc[ind,E_key]
+    if isinstance(Es,np.float64) or isinstance(Es,np.float32) and npass == 1: #Handle single value
+      if Es >= cutoff: #Passes cutoff
+        keep_indeces.append(ind)
+    else:
+      if len([x for x in Es if x >= cutoff]) >= npass: #An event exceeding threshold E
+        keep_indeces.append(ind)
+  return keep_indeces #Multiindex to index df
 
 
 
