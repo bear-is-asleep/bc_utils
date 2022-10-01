@@ -131,7 +131,7 @@ def make_cuts(df,pdg_key=f'{primprefix}pdg',status_key=f'{primprefix}gstatus',me
           keep_indeces.append(index)
       else: #handle initial electron
         e_temp = e_df[e_df.loc[:,status_key]!=0] #Don't use initial electron
-        if e_temp.loc[index,Etheta_key] < Etheta: #Less than cutoff
+        if (e_temp.loc[index,Etheta_key] < Etheta).all(): #Less than cutoff
           #print(e_df.loc[index,Etheta_key].values[0] < Etheta,Etheta,e_df.loc[index,Etheta_key].values[0])
           keep_indeces.append(index)
   
@@ -184,9 +184,10 @@ def cut_pdg_event(df,pdg,pdg_key=f'{primprefix}pdg',status_key=f'{primprefix}gst
   drop_inds = []
   indeces = list(df.index.drop_duplicates()) #Get run info for each event
   start = time()
+  df.sort_index()
   for ind in indeces:
     row = df.loc[ind]
-    row = row[row.loc[:,status_key] == 1] #Check outgoing final state particles
+    #row = row[row.loc[:,status_key] == 1] #Check outgoing final state particles
     row = row[abs(row.loc[:,pdg_key]) == pdg] #Keep only correct pdg in event
     Ts = row[T_key]
     if len([x for x in Ts if x >= E_threshold]) >= max_count: #An event exceeding threshold E
