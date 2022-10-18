@@ -72,6 +72,7 @@ def get_df_keepindeces(df,keep_indeces):
   indeces = list(df.index.drop_duplicates()) #Get event list
   keep_indeces = list(keep_indeces)
   common_indeces = list(set(indeces).intersection(keep_indeces)) #keep indeces in common
+  df = df.sort_index()
   return df.loc[common_indeces]
 
 
@@ -120,6 +121,7 @@ def make_cuts(df,pdg_key=f'{primprefix}pdg',status_key=f'{primprefix}gstatus',me
   e_df = df[abs(df.loc[:,pdg_key]) == 11] #Filter by electron
   indeces = list(e_df.index.drop_duplicates()) #Get event indeces
   keep_indeces = [] #keep indeces if they pass the cut
+  cnt = 0
   for index in indeces:
     if method == 0: #E theta^2 cut
       E_theta = e_df.loc[index,Etheta_key]
@@ -129,11 +131,19 @@ def make_cuts(df,pdg_key=f'{primprefix}pdg',status_key=f'{primprefix}gstatus',me
         #print(index,E_theta,Etheta,E_theta < Etheta)
         if E_theta < Etheta: #Less than cutoff
           keep_indeces.append(index)
+        else:
+          if cnt <3:
+            print(f'Etheta ind {index}')
+            cnt+=1
       else: #handle initial electron
         e_temp = e_df[e_df.loc[:,status_key]!=0] #Don't use initial electron
         if (e_temp.loc[index,Etheta_key] < Etheta).all(): #Less than cutoff
-          #print(e_df.loc[index,Etheta_key].values[0] < Etheta,Etheta,e_df.loc[index,Etheta_key].values[0])
+          print(e_df.loc[index,Etheta_key].values[0] < Etheta,Etheta,e_df.loc[index,Etheta_key].values[0])
           keep_indeces.append(index)
+        else:
+          if cnt <3:
+            print(f'Etheta ind {index}')
+            cnt+=1
   
   return df.loc[keep_indeces],keep_indeces
 
@@ -185,6 +195,7 @@ def cut_pdg_event(df,pdg,pdg_key=f'{primprefix}pdg',status_key=f'{primprefix}gst
   indeces = list(df.index.drop_duplicates()) #Get run info for each event
   start = time()
   df.sort_index()
+  cnt = 0
   for ind in indeces:
     row = df.loc[ind]
     #row = row[row.loc[:,status_key] == 1] #Check outgoing final state particles
@@ -192,10 +203,14 @@ def cut_pdg_event(df,pdg,pdg_key=f'{primprefix}pdg',status_key=f'{primprefix}gst
     Ts = row[T_key]
     if len([x for x in Ts if x >= E_threshold]) >= max_count: #An event exceeding threshold E
       drop_inds.append(ind)
+      if cnt <3:
+        print(f'Truth pdg {pdg} Cut ind {ind}')
+        cnt+=1
   if not exclude: #Switch this to inds we want to keep
     df = df.loc[drop_inds]
   else:
     df = df.drop(drop_inds)
+    print('we did it')
   return df,drop_inds
 
 def cut_nshws(df,nshw,nshw_key=f'{recoprefix}nshw'):
@@ -203,9 +218,14 @@ def cut_nshws(df,nshw,nshw_key=f'{recoprefix}nshw'):
   keep_inds = []
   indeces = list(df.index.drop_duplicates()) #Get run info for each event
   start = time()
+  cnt = 0
   for ind in indeces:
     if df.loc[ind,nshw_key] == nshw: #Number of showers equals target number
       keep_inds.append(ind)
+    else:
+      if cnt <3:
+        print(f'nshw Cut ind {ind}')
+        cnt+=1
   return df.loc[keep_inds],keep_inds
 
 def cut_ntrks(df,ntrk,ntrk_key=f'{recoprefix}ntrk'):
@@ -213,9 +233,14 @@ def cut_ntrks(df,ntrk,ntrk_key=f'{recoprefix}ntrk'):
   keep_inds = []
   indeces = list(df.index.drop_duplicates()) #Get run info for each event
   start = time()
+  cnt = 0 #Print single event that doesn't pass this cut
   for ind in indeces:
     if df.loc[ind,ntrk_key] == ntrk: #Number of showers equals target number
       keep_inds.append(ind)
+    else:
+      if cnt <3:
+        print(f'ntrk Cut ind {ind}')
+        cnt+=1
   return df.loc[keep_inds],keep_inds
 
 def true_nue(df,pdg_key=f'{primprefix}pdg',drop=True):
@@ -300,11 +325,16 @@ def cut_razzlescore(df,score_key=f'{shwprefix}razzle.electronScore',cutoff=0.5,n
   """Return dataframe with scores above cutoff razzle score, works for nshw shower"""
   indeces = df.index.drop_duplicates()
   pass_inds = []
+  cnt = 0 #Print single event that doesn't pass this cut
   for ind in indeces:
     #print(df.loc[ind,score_key])
     scores = [df.loc[ind,score_key]]
     if len([score for score in scores if score>cutoff]) == nshw: #True if there are nshw scores greater than cutoff
       pass_inds.append(ind)
+    else:
+      if cnt <3:
+        print(f'Razzle Cut ind {ind}')
+        cnt+=1
   return df.loc[pass_inds]
 
 def find_index_with_key(dfs,key):
@@ -331,6 +361,7 @@ def FV_cut(df,x_key=f'{mcnuprefix}position.x',y_key=f'{mcnuprefix}position.y',z_
   """Make truth level fidicual cut, we won't see these events"""
   keep_indeces = []
   indeces = df.index.drop_duplicates()
+  cnt = 0 #Print single event that doesn't pass this cut
   for ind in indeces:
     #Get genie vertex coords.
     x = df.loc[ind,x_key]
@@ -339,6 +370,11 @@ def FV_cut(df,x_key=f'{mcnuprefix}position.x',y_key=f'{mcnuprefix}position.y',z_
 
     if abs(x) > xmin and abs(x) < xmax and abs(y) < ymax and abs(z) > zmin and abs(z) < zmax:
       keep_indeces.append(ind)
+    else:
+      if cnt <3:
+        print(f'FV Cut ind {ind}')
+        cnt+=1
+
   return keep_indeces #Multiindex to index df
 
 def cut_recoE(df,E_key=f'{shwprefix}bestplane_energy',cutoff=0.2,npass=1):
@@ -347,14 +383,23 @@ def cut_recoE(df,E_key=f'{shwprefix}bestplane_energy',cutoff=0.2,npass=1):
   """
   keep_indeces = []
   indeces = df.index.drop_duplicates()
+  cnt = 0 #Print single event that doesn't pass this cut
   for ind in indeces:
     Es = df.loc[ind,E_key]
     if isinstance(Es,np.float64) or isinstance(Es,np.float32) and npass == 1: #Handle single value
       if Es >= cutoff: #Passes cutoff
         keep_indeces.append(ind)
+      else:
+        if cnt <3:
+          #print(f'Reco E Cut ind {ind}')
+          cnt+=1
     else:
       if len([x for x in Es if x >= cutoff]) >= npass: #An event exceeding threshold E
         keep_indeces.append(ind)
+      else:
+        if cnt <3:
+          #print(f'Reco E Cut ind {ind}')
+          cnt+=1
   return keep_indeces #Multiindex to index df
 
 
